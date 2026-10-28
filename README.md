@@ -4,6 +4,7 @@ A standalone, self-hosted take on GoHighLevel's AI Studio and Agent Studio:
 
 - **Site Builder** — describe a website, landing page, funnel step, booking page or form; AI builds it. Keep chatting to change it, edit the code directly, roll back versions, publish to a URL, and collect form submissions.
 - **Agent Studio** — create AI chat agents with instructions, guardrails and a knowledge base; test them in a playground; turn on an embeddable chat widget for your CapHub sites or any website; review conversations.
+- **App Builder** — describe a full-stack web app; an AI coding agent writes a Next.js + Postgres project (with sign-up/login, user/admin roles and an admin panel built in), runs it in an isolated Docker container, checks its own work, and keeps iterating with you. Live preview, code editor, logs, versions, zip download and push to GitHub.
 - **Switchable AI providers** — Anthropic (Claude) or OpenAI. The admin picks the active provider and model in **Settings → AI Providers** and can switch at any time. Individual agents can be pinned to a specific provider/model.
 
 ## Quick start (macOS)
@@ -26,6 +27,47 @@ Production:
 ```zsh
 npm run build && npm start
 ```
+
+## App Builder
+
+The App Builder needs **Docker** on the machine running CapHub Studio. On a Mac:
+
+```zsh
+brew install colima docker   # or install Docker Desktop / OrbStack instead
+colima start --cpu 4 --memory 8
+```
+
+Then open **App Builder**, describe an app and click **Build app**. The first build downloads the `node:22-bookworm-slim` and `postgres:16-alpine` images (~300 MB).
+
+How it works:
+
+```
+CapHub Studio (Next.js)                         Docker network: caphub-net
+ ├─ coding agent ── tools ──► files in data/apps/<id>/workspace  ─┐
+ │                 run_command / check_page / logs ──────────────►│ caphub-app-<id>  (node, `next dev`, bind-mounts the workspace)
+ ├─ preview proxy 127.0.0.1:<port> ──(strips CapHub cookies)──────►│      │
+ └─ GitHub push (REST API)                                        │      ▼
+                                                                  └ caphub-postgres  (one database + role per app; not exposed to the host)
+```
+
+- **Template:** `templates/nextjs-postgres` — Next.js 16, TypeScript, Tailwind v4, Drizzle ORM, email/password auth (bcrypt + signed JWT cookie), `user`/`admin` roles (first sign-up is admin), admin panel, `/api/health`.
+- **Agent tools:** list/read/write/edit/delete files, search, run a command in the container (`npm install`, `npm run typecheck`, `npm run db:push`…), fetch a page from the running app, read dev-server logs, restart the app. It verifies its work (type-check + page checks) before reporting back.
+- **Turns run in the background** — you can close the tab; reopening the app resumes the live activity feed. One turn per app at a time; **Stop** cancels it.
+- **Versions:** the project files are snapshotted after every AI turn and manual edit (last 30 kept). Restoring doesn't roll back database data.
+- **Isolation:** each app container drops Linux capabilities, uses `no-new-privileges`, has memory/CPU/PID limits, runs as the workspace owner (never root on a real Mac/Linux host), and can only reach its own database with its own credentials. Previews go through a proxy inside CapHub that removes CapHub's cookies, so generated code never sees your admin session.
+- **GitHub:** add a fine-grained token in **Settings → AI Providers → GitHub** (Contents + Administration read/write). Each push creates the repo if needed and makes its default branch match the project.
+
+App Builder settings (all optional):
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CAPHUB_APP_IMAGE` | `node:22-bookworm-slim` | Image apps run in (needs node, npm, bash, `setpriv`) |
+| `CAPHUB_PG_IMAGE` | `postgres:16-alpine` | Shared Postgres image |
+| `CAPHUB_APP_PORTS` | `4100-4999` | Preview ports |
+| `CAPHUB_APP_BIND` | `127.0.0.1` | Interface previews listen on |
+| `CAPHUB_APP_MEMORY` / `CAPHUB_APP_CPUS` | `2g` / `2` | Per-app container limits |
+| `CAPHUB_DOCKER_EXTRA_ARGS` | — | Extra `docker run` args (e.g. corporate proxy / CA settings) |
+| `GITHUB_TOKEN` | — | Fallback GitHub token |
 
 ## Configuration
 
@@ -95,6 +137,7 @@ public/
 
 SQLite + in-memory rate limiting means this MVP is designed for **one server instance with a persistent disk** (a VPS, Fly.io/Render with a volume, a Mac mini, Docker with a mounted `data/` volume). It is not suited to serverless platforms with ephemeral filesystems. Set `PUBLIC_BASE_URL`, put it behind HTTPS, and back up `data/caphub.db`.
 
-## Not included yet (vs GoHighLevel)
+## Not included yet
 
-Custom domains, multi-page sites, multi-user/sub-accounts, CRM contacts/pipelines, calendars with real availability, SMS/email/voice channels, workflow automations, and agent actions (tool calls such as booking or tagging contacts). The provider layer and data model are set up so these can be added incrementally.
+- **App Builder:** one-click production deploys and custom domains for generated apps (download the zip or push to GitHub and deploy anywhere that runs Next.js + Postgres), database browser, per-app environment variables, rolling back database data.
+- **Vs GoHighLevel:** custom domains for sites, multi-user/sub-accounts, CRM contacts/pipelines, calendars with real availability, SMS/email/voice channels, workflow automations, and agent actions (tool calls such as booking or tagging contacts).

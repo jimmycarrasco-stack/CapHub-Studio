@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, PageHeader, timeAgo } from "@/components/ui";
+import { Badge, PageHeader } from "@/components/ui";
+import { timeAgo } from "@/lib/format";
 import { listSites } from "@/lib/repo";
 import { NewSiteForm } from "./new-site-form";
 

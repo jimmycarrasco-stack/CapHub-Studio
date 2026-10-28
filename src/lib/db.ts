@@ -98,6 +98,40 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_submissions_site ON form_submissions(site_id, id);
   `,
+  // 2 — App Builder (full-stack apps)
+  `
+  CREATE TABLE apps (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    template    TEXT NOT NULL DEFAULT 'nextjs-postgres',
+    port        INTEGER NOT NULL UNIQUE,
+    db_name     TEXT NOT NULL,
+    db_password TEXT NOT NULL,              -- encrypted
+    auth_secret TEXT NOT NULL,              -- encrypted
+    github_repo TEXT,                       -- owner/name after first push
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE app_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id     TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    role       TEXT NOT NULL,               -- user | assistant
+    content    TEXT NOT NULL,               -- user prompt, or assistant summary
+    events     TEXT,                        -- JSON: compact log of the agent's steps
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX idx_app_messages_app ON app_messages(app_id, id);
+
+  CREATE TABLE app_snapshots (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    app_id     TEXT NOT NULL REFERENCES apps(id) ON DELETE CASCADE,
+    note       TEXT NOT NULL,
+    files      INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX idx_app_snapshots_app ON app_snapshots(app_id, id);
+  `,
 ];
 
 export function migrate(db: Database.Database) {

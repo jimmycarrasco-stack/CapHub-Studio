@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Scan our sources explicitly (doesn't depend on how the bundler picks the project root). */
+@source "../";
 
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;

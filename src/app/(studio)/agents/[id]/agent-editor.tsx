@@ -438,7 +438,9 @@ function Playground({ agent, dirty }: { agent: Agent; dirty: boolean }) {
   const [meta, setMeta] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => endRef.current?.scrollIntoView({ block: "end" }), [messages, busy]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages, busy]);
 
   async function send(e: React.FormEvent) {
     e.preventDefault();

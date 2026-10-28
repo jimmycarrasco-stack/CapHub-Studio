@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, Badge, Button, Card, cx, Field, Input, PageHeader, toast } from "@/components/ui";
 import { ENV_KEYS, MODEL_SUGGESTIONS, PROVIDER_LABELS, PROVIDERS, type ProviderName } from "@/lib/llm/catalog";
 import type { AiSettings } from "@/lib/settings";
+import { RuntimeSettings } from "./runtime-settings";
 
 export function ProviderSettings({ initial }: { initial: AiSettings }) {
   const router = useRouter();
@@ -164,6 +165,8 @@ export function ProviderSettings({ initial }: { initial: AiSettings }) {
           );
         })}
       </div>
+
+      <RuntimeSettings />
     </div>
   );
 }

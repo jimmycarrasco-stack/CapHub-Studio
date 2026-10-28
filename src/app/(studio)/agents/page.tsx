@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Badge, PageHeader, timeAgo } from "@/components/ui";
+import { Badge, PageHeader } from "@/components/ui";
+import { timeAgo } from "@/lib/format";
 import { PROVIDER_LABELS } from "@/lib/llm/catalog";
 import { listAgents } from "@/lib/repo";
 import { NewAgentForm } from "./new-agent-form";

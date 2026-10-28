@@ -6,6 +6,16 @@ export async function collect(it: AsyncIterable<string>) {
   return out;
 }
 
+/** Parses a tool-call JSON argument string; null if invalid or not an object. */
+export function parseToolInput(s: string): Record<string, unknown> | null {
+  try {
+    const v = JSON.parse(s);
+    return v && typeof v === "object" && !Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Turns SDK errors into short, admin-readable messages without leaking keys. */
 export function normalizeError(label: string, err: unknown): Error {
   if (err instanceof HttpError) return err;
