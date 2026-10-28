@@ -1,6 +1,9 @@
 "use client";
 
 import { forwardRef, useSyncExternalStore } from "react";
+import { cx, timeAgo } from "@/lib/format";
+
+export { cx, timeAgo };
 
 // ───────────── fetch helper ─────────────
 
@@ -65,9 +68,6 @@ export function Toaster() {
 
 // ───────────── primitives ─────────────
 
-export function cx(...parts: (string | false | null | undefined)[]) {
-  return parts.filter(Boolean).join(" ");
-}
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -168,16 +168,6 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
       <span className={cx("inline-block size-4 rounded-full bg-white shadow transition-transform", checked ? "translate-x-4.5" : "translate-x-0.5")} />
     </button>
   );
-}
-
-export function timeAgo(sqliteUtc: string) {
-  const t = new Date(sqliteUtc.replace(" ", "T") + "Z").getTime();
-  const s = Math.max(0, Math.round((Date.now() - t) / 1000));
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 86400 * 30) return `${Math.floor(s / 86400)}d ago`;
-  return new Date(t).toLocaleDateString();
 }
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: React.ReactNode }) {

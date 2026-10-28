@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { PROVIDER_LABELS, PROVIDERS } from "@/lib/llm/catalog";
+import { listApps } from "@/lib/apps/repo";
 import { dashboardStats, listAgents, listSites } from "@/lib/repo";
 import { getAiSettings } from "@/lib/settings";
 
@@ -14,15 +15,16 @@ export default function Dashboard() {
   const activeHasKey = ai.providers[ai.activeProvider].keySource !== "none";
 
   const tiles = [
+    { label: "Apps", value: listApps().length, sub: "full-stack builds", href: "/apps" },
     { label: "Sites", value: stats.sites, sub: `${stats.published} published`, href: "/sites" },
     { label: "Form submissions", value: stats.submissions, sub: "across all sites", href: "/sites" },
     { label: "Agents", value: stats.agents, sub: "in Agent Studio", href: "/agents" },
-    { label: "Widget conversations", value: stats.conversations, sub: "from visitors", href: "/agents" },
+    { label: "Chats", value: stats.conversations, sub: "widget conversations", href: "/agents" },
   ];
 
   return (
     <div className="mx-auto max-w-6xl p-6 md:p-10">
-      <PageHeader title="Dashboard" subtitle="Build sites and AI agents from a prompt." />
+      <PageHeader title="Dashboard" subtitle="Build apps, sites and AI agents from a prompt." />
 
       {!activeHasKey && (
         <Link href="/settings" className="mb-6 block rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100">
@@ -30,7 +32,7 @@ export default function Dashboard() {
         </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         {tiles.map((t) => (
           <Link key={t.label} href={t.href} className="rounded-xl bg-white p-4 ring-1 ring-zinc-200 transition hover:ring-zinc-300">
             <div className="text-xs font-medium text-zinc-500">{t.label}</div>

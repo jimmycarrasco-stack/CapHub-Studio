@@ -7,6 +7,7 @@ import { cx } from "./ui";
 const NAV = [
   { href: "/", label: "Dashboard", icon: "M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10" },
   { href: "/sites", label: "Site Builder", icon: "M4 5h16v14H4zM4 9h16M8 5v4" },
+  { href: "/apps", label: "App Builder", icon: "M16 18l6-6-6-6M8 6l-6 6 6 6" },
   { href: "/agents", label: "Agent Studio", icon: "M12 8V4H8M4 12a8 8 0 0 0 16 0v-1a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3zM9 13h.01M15 13h.01" },
   { href: "/settings", label: "AI Providers", icon: "M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 0 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9H3a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.6 7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 2.9-1.2V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 2.9 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0 1.2 2.9H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" },
 ];

@@ -68,7 +68,6 @@ export async function dockerStatus() {
 
 /** Strips ANSI colour codes from container output. */
 export function stripAnsi(s: string) {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "");
 }
 
