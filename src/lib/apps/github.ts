@@ -62,7 +62,7 @@ async function ghOk<T>(token: string, method: string, path: string, body?: unkno
 
 export async function pushToGithub(appId: string, opts: { repo?: string; private?: boolean; message?: string }) {
   const { token } = getGithubToken();
-  if (!token) throw new HttpError(400, "Add a GitHub token in Settings → AI Providers → GitHub first");
+  if (!token) throw new HttpError(400, "Add a GitHub token in Settings → AI & runtime → GitHub first");
   const app = requireApp(appId);
 
   const me = await ghOk<{ login: string }>(token, "GET", "/user");

@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handle, parseBody, requireAdmin } from "@/lib/http";
+import { requireAgencyAdmin } from "@/lib/auth";
+import { handle, parseBody } from "@/lib/http";
 import { getGithubToken, setGithubToken } from "@/lib/apps/github";
 import { runtimeStatus } from "@/lib/apps/runtime";
 
 /** App Builder environment: Docker status, shared Postgres, GitHub token presence. */
 export const GET = handle(async () => {
-  await requireAdmin();
+  await requireAgencyAdmin();
   const s = await runtimeStatus();
   const gh = getGithubToken();
   return NextResponse.json({
@@ -19,7 +20,7 @@ export const GET = handle(async () => {
 });
 
 export const PUT = handle(async (req: Request) => {
-  await requireAdmin();
+  await requireAgencyAdmin();
   const { githubToken } = await parseBody(req, z.object({ githubToken: z.string().max(500).nullable() }));
   setGithubToken(githubToken && githubToken.trim() ? githubToken : null);
   return NextResponse.json({ ok: true });

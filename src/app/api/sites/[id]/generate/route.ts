@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { handle, HttpError, parseBody, requireAdmin } from "@/lib/http";
+import { siteFor } from "@/lib/guards";
+import { handle, HttpError, parseBody } from "@/lib/http";
 import { getProvider } from "@/lib/llm";
 import { addSiteMessage, getSite, listSiteMessages, saveSiteHtml } from "@/lib/repo";
 import { buildGenerateMessages, parseSiteResponse, SITE_SYSTEM_PROMPT } from "@/lib/site-builder";
+import { formatMoney, listProducts } from "@/lib/crm/payments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -16,14 +18,19 @@ export const maxDuration = 300;
  * Errors before streaming starts (auth, missing API key) return normal JSON errors.
  */
 export const POST = handle(async (req: Request, ctx: Ctx) => {
-  await requireAdmin();
   const { id } = await ctx.params;
-  const site = getSite(id);
-  if (!site) throw new HttpError(404, "Site not found");
+  const { site } = await siteFor(id);
   const { prompt } = await parseBody(req, z.object({ prompt: z.string().trim().min(1).max(20_000) }));
 
   const provider = getProvider("default");
-  const messages = buildGenerateMessages({ instruction: prompt, currentHtml: site.html, history: listSiteMessages(site.id) });
+  const products = site.location_id
+    ? listProducts(site.location_id, { activeOnly: true }).map((p) => ({
+        id: p.id,
+        name: p.name,
+        price: `${formatMoney(p.price_cents, p.currency)}${p.interval ? ` / ${p.interval}` : ""}`,
+      }))
+    : [];
+  const messages = buildGenerateMessages({ instruction: prompt, currentHtml: site.html, history: listSiteMessages(site.id), products });
   addSiteMessage(site.id, "user", prompt);
 
   const encoder = new TextEncoder();

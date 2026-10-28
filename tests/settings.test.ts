@@ -58,8 +58,10 @@ describe("AI settings", () => {
 describe("repo", () => {
   it("creates unique slugs and versions sites", async () => {
     const repo = await import("@/lib/repo");
-    const a = repo.createSite("My Site");
-    const b = repo.createSite("My Site");
+    const { createLocation } = await import("@/lib/auth");
+    const loc = createLocation({ name: "L" });
+    const a = repo.createSite("My Site", loc.id);
+    const b = repo.createSite("My Site", loc.id);
     expect(a.slug).toBe("my-site");
     expect(b.slug).toBe("my-site-2");
     repo.saveSiteHtml(a.id, "<html>1</html>", "v1");
@@ -74,12 +76,42 @@ describe("repo", () => {
 
   it("detaches agents from sites when the agent is deleted", async () => {
     const repo = await import("@/lib/repo");
-    const agent = repo.createAgent({ name: "Ava" });
-    const site = repo.createSite("S");
+    const { createLocation } = await import("@/lib/auth");
+    const loc = createLocation({ name: "L" });
+    const agent = repo.createAgent(loc.id, { name: "Ava" });
+    const site = repo.createSite("S", loc.id);
     repo.updateSite(site.id, { agent_id: agent.id });
     repo.addKnowledge(agent.id, "t", "c");
     repo.deleteAgent(agent.id);
     expect(repo.getSite(site.id)!.agent_id).toBeNull();
     expect(repo.listKnowledge(agent.id)).toEqual([]);
+  });
+
+  it("migrates pre-CRM data into a first sub-account", async () => {
+    const Database = (await import("better-sqlite3")).default;
+    const { migrate } = await import("@/lib/db");
+    const d = new Database(":memory:");
+    d.pragma("foreign_keys = ON");
+    // Build the v2 schema by running only the first two migrations, then add legacy rows.
+    const real = d.pragma.bind(d);
+    let version = 0;
+    d.pragma = ((src: string, opts?: unknown) => {
+      if (src === "user_version") return version as never;
+      if (src.startsWith("user_version =")) {
+        version = Number(src.split("=")[1]);
+        return [] as never;
+      }
+      return real(src, opts as never) as never;
+    }) as typeof d.pragma;
+    const all = (await import("@/lib/db")).MIGRATIONS_FOR_TESTS;
+    for (const m of all.slice(0, 2)) d.exec(m as string);
+    version = 2;
+    d.prepare("INSERT INTO sites (id, name, slug) VALUES ('s1', 'Old', 'old')").run();
+    d.prepare("INSERT INTO agents (id, name) VALUES ('a1', 'Old agent')").run();
+    migrate(d);
+    const loc = d.prepare("SELECT * FROM locations").get() as { id: string; name: string };
+    expect(loc.name).toBe("Main account");
+    expect((d.prepare("SELECT location_id FROM sites WHERE id = 's1'").get() as { location_id: string }).location_id).toBe(loc.id);
+    expect((d.prepare("SELECT location_id FROM agents WHERE id = 'a1'").get() as { location_id: string }).location_id).toBe(loc.id);
   });
 });

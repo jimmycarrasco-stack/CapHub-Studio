@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handle, parseBody, requireAdmin } from "@/lib/http";
+import { requireAgencyAdmin } from "@/lib/auth";
+import { handle, parseBody } from "@/lib/http";
 import { getProvider } from "@/lib/llm";
 import { PROVIDERS } from "@/lib/llm/catalog";
 
 /** Sends a tiny request to verify the key + model for a provider. */
 export const POST = handle(async (req: Request) => {
-  await requireAdmin();
+  await requireAgencyAdmin();
   const { provider } = await parseBody(req, z.object({ provider: z.enum(PROVIDERS) }));
   const p = getProvider(provider);
   const started = Date.now();

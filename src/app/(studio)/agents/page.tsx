@@ -2,13 +2,15 @@ import Link from "next/link";
 import { Badge, PageHeader } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
 import { PROVIDER_LABELS } from "@/lib/llm/catalog";
+import { pageCtx } from "@/lib/page-ctx";
 import { listAgents } from "@/lib/repo";
 import { NewAgentForm } from "./new-agent-form";
 
 export const metadata = { title: "Agent Studio" };
 
-export default function AgentsPage() {
-  const agents = listAgents();
+export default async function AgentsPage() {
+  const ctx = await pageCtx();
+  const agents = listAgents(ctx.location.id);
   return (
     <div className="mx-auto max-w-6xl p-6 md:p-10">
       <PageHeader

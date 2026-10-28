@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { pageAccess } from "@/lib/page-ctx";
 import { headers } from "next/headers";
 import { getAgent, listKnowledge } from "@/lib/repo";
 import { getAiSettings } from "@/lib/settings";
@@ -12,6 +13,7 @@ export default async function AgentPage({ params }: { params: Promise<{ id: stri
   const { id } = await params;
   const agent = getAgent(id);
   if (!agent) notFound();
+  await pageAccess(agent.location_id);
 
   const h = await headers();
   const base =

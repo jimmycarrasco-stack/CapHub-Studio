@@ -42,10 +42,13 @@ export function SiteEditor({
   initialSite,
   initialMessages,
   agents,
+  serverPrompt = null,
 }: {
   initialSite: Site;
   initialMessages: SiteMessage[];
   agents: { id: string; name: string; widget_enabled: boolean }[];
+  /** Prompt queued server-side (e.g. by the AI Guide) to run on first open. */
+  serverPrompt?: string | null;
 }) {
   const router = useRouter();
   const origin = useOrigin();
@@ -158,15 +161,15 @@ export function SiteEditor({
   useEffect(() => {
     if (autoRan.current) return;
     autoRan.current = true;
-    let pending: string | null = null;
+    let pending: string | null = serverPrompt;
     try {
-      pending = sessionStorage.getItem(PENDING_PROMPT_KEY(site.id));
+      pending = sessionStorage.getItem(PENDING_PROMPT_KEY(site.id)) ?? pending;
       sessionStorage.removeItem(PENDING_PROMPT_KEY(site.id));
     } catch {
       /* ignore */
     }
     if (pending && !initialSite.html) void generate(pending);
-  }, [generate, initialSite.html, site.id]);
+  }, [generate, initialSite.html, site.id, serverPrompt]);
 
   // Lazy-load tab data.
   useEffect(() => {

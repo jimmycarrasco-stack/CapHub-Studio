@@ -48,7 +48,7 @@ export function Toaster() {
     () => toasts,
   );
   return (
-    <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-[min(380px,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
+    <div className="pointer-events-none fixed bottom-20 right-4 z-50 flex w-[min(380px,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
       {list.map((t) => (
         <div
           key={t.id}
@@ -178,6 +178,64 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
         {subtitle && <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>}
       </div>
       {actions}
+    </div>
+  );
+}
+
+// ───────────── modal & select ─────────────
+
+export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: React.ReactNode; wide?: boolean }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 p-0 sm:items-center sm:p-4"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+    >
+      <div role="dialog" aria-modal="true" aria-label={title} className={cx("max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-2xl", wide ? "sm:max-w-2xl" : "sm:max-w-md")}>
+        <div className="flex items-center justify-between border-b border-zinc-100 px-5 py-3.5">
+          <h2 className="text-sm font-semibold">{title}</h2>
+          <button type="button" aria-label="Close" onClick={onClose} className="rounded p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700">
+            ✕
+          </button>
+        </div>
+        <div className="p-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+export const Select = forwardRef<HTMLSelectElement, React.SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, ...rest }, ref) {
+  // An explicit width class replaces the default full width.
+  const base = /(^|\s)(w-|max-w-)/.test(className ?? "") ? fieldBase.replace("w-full ", "") : fieldBase;
+  return <select ref={ref} {...rest} className={cx(base, "h-9 pr-8", className)} />;
+});
+
+/** "$1,234.00" from cents, client-side. */
+export function money(cents: number, currency = "cad") {
+  try {
+    return new Intl.NumberFormat("en-CA", { style: "currency", currency: currency.toUpperCase() }).format(cents / 100);
+  } catch {
+    return `${(cents / 100).toFixed(2)} ${currency.toUpperCase()}`;
+  }
+}
+
+/** Parses "1,234.50" into cents (null if invalid). */
+export function toCents(v: string): number | null {
+  const n = Number(v.replace(/[,$\s]/g, ""));
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null;
+}
+
+export function EmptyState({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
+  return (
+    <div className="rounded-xl border border-dashed border-zinc-300 px-6 py-12 text-center">
+      <p className="text-sm font-medium text-zinc-800">{title}</p>
+      {children && <p className="mx-auto mt-1 max-w-md text-sm text-zinc-500">{children}</p>}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }

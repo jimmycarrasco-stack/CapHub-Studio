@@ -1,17 +1,9 @@
 import "server-only";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
-import { SESSION_COOKIE, verifySessionToken } from "./session";
 import { HttpError } from "./errors";
 
 export { HttpError };
-
-/** Defense in depth: the proxy already gates admin routes, but each handler re-checks. */
-export async function requireAdmin() {
-  const token = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!(await verifySessionToken(token, process.env.APP_SECRET))) throw new HttpError(401, "Not signed in");
-}
 
 export async function parseBody<T>(req: Request, schema: ZodType<T>): Promise<T> {
   let raw: unknown;

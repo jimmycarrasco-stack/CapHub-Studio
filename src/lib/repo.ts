@@ -12,6 +12,8 @@ export interface Site {
   html: string;
   published: boolean;
   agent_id: string | null;
+  location_id: string | null;
+  pending_prompt: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -43,6 +45,7 @@ export interface Submission {
 
 export interface Agent {
   id: string;
+  location_id: string | null;
   name: string;
   description: string;
   instructions: string;
@@ -71,15 +74,15 @@ const toAgent = (r: Row) => ({ ...r, widget_enabled: !!r.widget_enabled }) as un
 
 // ───────────────────────── Sites ─────────────────────────
 
-export function listSites(): SiteSummary[] {
+export function listSites(locationId: string): SiteSummary[] {
   return (
     db()
       .prepare(
         `SELECT s.id, s.name, s.slug, s.published, s.agent_id, s.created_at, s.updated_at,
                 (SELECT COUNT(*) FROM form_submissions f WHERE f.site_id = s.id) AS submissions
-         FROM sites s ORDER BY s.updated_at DESC`,
+         FROM sites s WHERE s.location_id = ? ORDER BY s.updated_at DESC`,
       )
-      .all() as Row[]
+      .all(locationId) as Row[]
   ).map((r) => ({ ...r, published: !!r.published }) as unknown as SiteSummary);
 }
 
@@ -103,10 +106,17 @@ function uniqueSlug(base: string, excludeId?: string) {
   }
 }
 
-export function createSite(name: string): Site {
+export function createSite(name: string, locationId: string, pendingPrompt?: string): Site {
   const id = nanoid(12);
-  db().prepare("INSERT INTO sites (id, name, slug) VALUES (?, ?, ?)").run(id, name, uniqueSlug(name));
+  db().prepare("INSERT INTO sites (id, name, slug, location_id, pending_prompt) VALUES (?, ?, ?, ?, ?)").run(id, name, uniqueSlug(name), locationId, pendingPrompt ?? null);
   return getSite(id)!;
+}
+
+/** Returns and clears a prompt queued by the AI Guide, so the editor can run it once. */
+export function takePendingPrompt(siteId: string): string | null {
+  const r = db().prepare("SELECT pending_prompt FROM sites WHERE id = ?").get(siteId) as { pending_prompt: string | null } | undefined;
+  if (r?.pending_prompt) db().prepare("UPDATE sites SET pending_prompt = NULL WHERE id = ?").run(siteId);
+  return r?.pending_prompt ?? null;
 }
 
 export function updateSite(id: string, patch: Partial<Pick<Site, "name" | "slug" | "published" | "agent_id">>) {
@@ -176,16 +186,16 @@ export function listSubmissions(siteId: string): Submission[] {
 
 // ───────────────────────── Agents ─────────────────────────
 
-export function listAgents(): (Agent & { knowledge_count: number; conversation_count: number })[] {
+export function listAgents(locationId: string): (Agent & { knowledge_count: number; conversation_count: number })[] {
   return (
     db()
       .prepare(
         `SELECT a.*,
           (SELECT COUNT(*) FROM knowledge k WHERE k.agent_id = a.id) AS knowledge_count,
           (SELECT COUNT(*) FROM conversations c WHERE c.agent_id = a.id) AS conversation_count
-         FROM agents a ORDER BY a.updated_at DESC`,
+         FROM agents a WHERE a.location_id = ? ORDER BY a.updated_at DESC`,
       )
-      .all() as Row[]
+      .all(locationId) as Row[]
   ).map((r) => toAgent(r) as Agent & { knowledge_count: number; conversation_count: number });
 }
 
@@ -194,11 +204,11 @@ export function getAgent(id: string): Agent | null {
   return r ? toAgent(r) : null;
 }
 
-export function createAgent(input: { name: string; description?: string; instructions?: string }): Agent {
+export function createAgent(locationId: string, input: { name: string; description?: string; instructions?: string }): Agent {
   const id = nanoid(12);
   db()
-    .prepare("INSERT INTO agents (id, name, description, instructions) VALUES (?, ?, ?, ?)")
-    .run(id, input.name, input.description ?? "", input.instructions ?? "");
+    .prepare("INSERT INTO agents (id, name, description, instructions, location_id) VALUES (?, ?, ?, ?, ?)")
+    .run(id, input.name, input.description ?? "", input.instructions ?? "", locationId);
   return getAgent(id)!;
 }
 
@@ -282,13 +292,13 @@ export function getConversationForAgent(agentId: string, conversationId: string)
   return hit ? getConversationMessages(conversationId, 1000) : null;
 }
 
-export function dashboardStats() {
-  const one = (sql: string) => (db().prepare(sql).get() as { n: number }).n;
+export function dashboardStats(locationId: string) {
+  const one = (sql: string) => (db().prepare(sql).get(locationId) as { n: number }).n;
   return {
-    sites: one("SELECT COUNT(*) AS n FROM sites"),
-    published: one("SELECT COUNT(*) AS n FROM sites WHERE published = 1"),
-    agents: one("SELECT COUNT(*) AS n FROM agents"),
-    submissions: one("SELECT COUNT(*) AS n FROM form_submissions"),
-    conversations: one("SELECT COUNT(*) AS n FROM conversations WHERE source = 'widget'"),
+    sites: one("SELECT COUNT(*) AS n FROM sites WHERE location_id = ?"),
+    published: one("SELECT COUNT(*) AS n FROM sites WHERE published = 1 AND location_id = ?"),
+    agents: one("SELECT COUNT(*) AS n FROM agents WHERE location_id = ?"),
+    submissions: one("SELECT COUNT(*) AS n FROM form_submissions f JOIN sites s ON s.id = f.site_id WHERE s.location_id = ?"),
+    conversations: one("SELECT COUNT(*) AS n FROM conversations c JOIN agents a ON a.id = c.agent_id WHERE c.source = 'widget' AND a.location_id = ?"),
   };
 }

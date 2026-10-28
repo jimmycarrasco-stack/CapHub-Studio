@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handle, HttpError, parseBody, requireAdmin } from "@/lib/http";
+import { agentFor } from "@/lib/guards";
+import { handle, HttpError, parseBody } from "@/lib/http";
 import { deleteAgent, getAgent, listKnowledge, updateAgent } from "@/lib/repo";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 async function load(ctx: Ctx) {
-  await requireAdmin();
   const { id } = await ctx.params;
-  const agent = getAgent(id);
-  if (!agent) throw new HttpError(404, "Agent not found");
+  const { agent } = await agentFor(id);
   return agent;
 }
 

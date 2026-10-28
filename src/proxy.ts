@@ -2,11 +2,20 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 /**
- * Gate every admin page and API behind the admin session.
- * Public surfaces: login, published pages (/p/*), public APIs (/api/public/*),
- * and the static runtime scripts in /public.
+ * Fast first-line gate: signed-out visitors can only reach public surfaces.
+ * Every page and API still checks the user's access to the specific sub-account/record.
  */
-const PUBLIC_PREFIXES = ["/login", "/api/auth/", "/p/", "/api/public/"];
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/setup",
+  "/api/auth/",
+  "/p/", // published sites
+  "/f/", // published funnels
+  "/pay/", // product payment links
+  "/api/public/", // forms, checkout, chat widget
+  "/api/webhooks/", // Stripe, Twilio
+  "/api/hooks/", // automation inbound webhooks
+];
 const PUBLIC_FILES = ["/widget.js", "/caphub-runtime.js", "/favicon.ico"];
 
 export async function proxy(req: NextRequest) {
@@ -15,8 +24,7 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const ok = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value, process.env.APP_SECRET);
-  if (ok) return NextResponse.next();
+  if (await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value, process.env.APP_SECRET)) return NextResponse.next();
 
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });

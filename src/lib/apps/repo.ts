@@ -13,6 +13,7 @@ export interface AppRow {
   port: number;
   db_name: string;
   github_repo: string | null;
+  location_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -42,10 +43,10 @@ export interface Snapshot {
   created_at: string;
 }
 
-const PUBLIC_COLS = "id, name, template, port, db_name, github_repo, created_at, updated_at";
+const PUBLIC_COLS = "id, name, template, port, db_name, github_repo, location_id, created_at, updated_at";
 
-export function listApps(): AppRow[] {
-  return db().prepare(`SELECT ${PUBLIC_COLS} FROM apps ORDER BY updated_at DESC`).all() as AppRow[];
+export function listApps(locationId: string): AppRow[] {
+  return db().prepare(`SELECT ${PUBLIC_COLS} FROM apps WHERE location_id = ? ORDER BY updated_at DESC`).all(locationId) as AppRow[];
 }
 
 export function getApp(id: string): AppRow | null {
@@ -70,12 +71,12 @@ function nextPort(): number {
   throw new HttpError(409, "No free preview ports left — delete an app or widen CAPHUB_APP_PORTS");
 }
 
-export function createAppRow(name: string): AppRow {
+export function createAppRow(name: string, locationId: string): AppRow {
   // Lowercase alphanumerics: safe for container, volume and Postgres identifiers.
   const id = nanoid(10).toLowerCase().replace(/[^a-z0-9]/g, "x");
   db()
-    .prepare("INSERT INTO apps (id, name, port, db_name, db_password, auth_secret) VALUES (?, ?, ?, ?, ?, ?)")
-    .run(id, name, nextPort(), `app_${id}`, encrypt(randomBytes(24).toString("base64url")), encrypt(randomBytes(32).toString("base64url")));
+    .prepare("INSERT INTO apps (id, name, port, db_name, db_password, auth_secret, location_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(id, name, nextPort(), `app_${id}`, encrypt(randomBytes(24).toString("base64url")), encrypt(randomBytes(32).toString("base64url")), locationId);
   return getApp(id)!;
 }
 

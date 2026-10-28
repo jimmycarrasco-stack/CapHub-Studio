@@ -21,7 +21,7 @@ export function getProvider(choice: ProviderChoice | null | undefined = "default
     choice && choice !== "default" && (PROVIDERS as readonly string[]).includes(choice) ? choice : getActiveProvider();
   const { apiKey, model } = resolveProvider(name);
   if (!apiKey) {
-    throw new HttpError(400, `${PROVIDER_LABELS[name]} has no API key. Add one in Settings → AI Providers.`);
+    throw new HttpError(400, `${PROVIDER_LABELS[name]} has no API key. Add one in Settings → AI & runtime (agency admins).`);
   }
   return buildProvider(name, apiKey, model);
 }
