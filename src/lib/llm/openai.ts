@@ -26,7 +26,11 @@ export function toOpenAIInput(messages: AgentMessage[]) {
   const input: unknown[] = [];
   for (const m of messages) {
     if (m.role === "user") input.push({ role: "user", content: m.content });
-    else if (m.role === "assistant") input.push(...((m.raw as unknown[]) ?? []));
+    else if (m.role === "assistant") {
+      // Replayed history without provider-native output falls back to plain text.
+      if (m.raw) input.push(...(m.raw as unknown[]));
+      else input.push({ role: "assistant", content: m.text || "(no reply)" });
+    }
     else for (const r of m.results) input.push({ type: "function_call_output", call_id: r.id, output: r.isError ? `ERROR: ${r.output}` : r.output || "(no output)" });
   }
   return input;

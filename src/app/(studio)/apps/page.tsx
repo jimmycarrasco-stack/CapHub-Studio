@@ -2,12 +2,14 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
 import { listApps } from "@/lib/apps/repo";
+import { pageCtx } from "@/lib/page-ctx";
 import { NewAppForm } from "./new-app-form";
 
 export const metadata = { title: "App Builder" };
 
-export default function AppsPage() {
-  const apps = listApps();
+export default async function AppsPage() {
+  const ctx = await pageCtx();
+  const apps = listApps(ctx.location.id);
   return (
     <div className="mx-auto max-w-6xl p-6 md:p-10">
       <PageHeader

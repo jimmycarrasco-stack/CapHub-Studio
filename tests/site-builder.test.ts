@@ -29,9 +29,13 @@ describe("injectRuntime", () => {
 
   it("injects before the last </body>", () => {
     const out = injectRuntime("<html><body><p>a</p></body></html>", base);
-    expect(out).toContain('window.__CAPHUB__={"siteId":"s1","api":"https://studio.test","mode":"live"}');
+    expect(out).toContain('window.__CAPHUB__={"siteId":"s1","api":"https://studio.test","mode":"live","next":null,"funnelId":null}');
     expect(out.indexOf("caphub-runtime.js")).toBeLessThan(out.indexOf("</body>"));
     expect(out).not.toContain("widget.js");
+  });
+
+  it("passes the next funnel step to the runtime", () => {
+    expect(injectRuntime("<body></body>", { ...base, next: "/f/promo/2", funnelId: "fn1" })).toContain('"next":"/f/promo/2","funnelId":"fn1"');
   });
 
   it("adds widget when an agent is attached", () => {

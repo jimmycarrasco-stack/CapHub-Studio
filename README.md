@@ -1,11 +1,22 @@
 # CapHub Studio
 
-A standalone, self-hosted take on GoHighLevel's AI Studio and Agent Studio:
+A simpler, self-hosted GoHighLevel-style CRM with an AI studio built in:
+
+- **Agency + sub-accounts** — one agency, many client sub-accounts. Each sub-account has its own contacts, pipelines, Stripe account, email settings, sites, funnels, apps, agents and team. Agency admins see everything; sub-account users only see the accounts they're added to.
+- **Contacts** — search, tags, custom fields, notes timeline, tasks, deals, payments, email history, automation runs, do-not-contact, CSV import/export.
+- **Pipelines** — drag-and-drop deal boards with editable stages, deal values, won/lost.
+- **Payments & products** — one-time and subscription products synced to the sub-account's Stripe; hosted payment links (`/pay/<id>`) and AI-built "Buy now" buttons on sites; orders and revenue; webhook for renewals and refunds.
+- **Automations** — trigger (contact created, tag added, form submitted, deal stage/status, payment, inbound webhook, manual) → steps (email incl. AI-written, notify team, tags, create/move deal, task, wait, condition, outbound webhook). Run logs per automation and per contact.
+- **Email** — send from the sub-account's own SMTP (Gmail, Microsoft 365, SendGrid, Resend, Mailgun…); every email is logged under Conversations.
+- **Funnels** — chain Site Builder pages; form submits move visitors to the next step and create/update the contact.
+- **AI Guide** — a chat drawer on every page that explains the app and does setup work for you (contacts, tags, notes, tasks, pipelines, deals, products, automations, sites, funnels). It can't delete anything or send emails, and automations it builds are saved switched off for review.
+
+And the original studio:
 
 - **Site Builder** — describe a website, landing page, funnel step, booking page or form; AI builds it. Keep chatting to change it, edit the code directly, roll back versions, publish to a URL, and collect form submissions.
 - **Agent Studio** — create AI chat agents with instructions, guardrails and a knowledge base; test them in a playground; turn on an embeddable chat widget for your CapHub sites or any website; review conversations.
 - **App Builder** — describe a full-stack web app; an AI coding agent writes a Next.js + Postgres project (with sign-up/login, user/admin roles and an admin panel built in), runs it in an isolated Docker container, checks its own work, and keeps iterating with you. Live preview, code editor, logs, versions, zip download and push to GitHub.
-- **Switchable AI providers** — Anthropic (Claude) or OpenAI. The admin picks the active provider and model in **Settings → AI Providers** and can switch at any time. Individual agents can be pinned to a specific provider/model.
+- **Switchable AI providers** — Anthropic (Claude) or OpenAI. The admin picks the active provider and model in **Settings → AI Providers** and can switch at any time. Individual agents can be pinned to a specific provider/model. (This is agency-wide: **Settings → AI & runtime**.)
 
 ## Quick start (macOS)
 
@@ -20,7 +31,9 @@ npm run setup        # creates .env.local with a generated APP_SECRET and admin 
 npm run dev          # http://localhost:3000
 ```
 
-Sign in with the password `npm run setup` printed, open **AI Providers**, paste an Anthropic and/or OpenAI API key, choose the active provider, and click **Test connection**.
+Open the app: the first visit goes to **/setup**, where you create the agency owner account. The "setup key" is the `ADMIN_PASSWORD` that `npm run setup` printed (it's in `.env.local`). Then open **Settings → AI & runtime**, paste an Anthropic and/or OpenAI API key, choose the active provider, and click **Test connection**.
+
+Upgrading an existing install: the database migrates automatically on start, and all existing sites, agents and apps move into a sub-account called **Main account**. Visit `/setup` once to create the owner login.
 
 Production:
 
@@ -127,9 +140,16 @@ public/
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest unit tests (providers with fake clients, settings/repo on in-memory SQLite, parsing, retrieval, security) |
 
+## CRM setup per sub-account
+
+1. **Stripe** — Settings → Stripe: paste a secret key (start with `sk_test_…`). For subscription renewals and refunds, add a Stripe webhook to the URL shown there (`/api/webhooks/stripe/<sub-account id>`) with `checkout.session.completed`, `invoice.paid`, `charge.refunded`, and paste its `whsec_…` signing secret. One-time payments are recorded even without the webhook (when the buyer returns to the success page), but Stripe can only call the webhook if CapHub Studio is reachable from the internet.
+2. **Email** — Settings → Email sending: pick a provider preset, enter SMTP credentials, **Save & verify**, then **Send test email**.
+3. **Automations** run in the server process (checked every 15 seconds); waits survive restarts. Set `CAPHUB_DISABLE_WORKER=1` to turn the runner off.
+
 ## Security notes
 
-- Single admin account; session is an HMAC-signed, httpOnly, SameSite=Lax cookie (7 days). Login is rate limited.
+- Per-user accounts (scrypt-hashed passwords); sessions are HMAC-signed, httpOnly, SameSite=Lax cookies (7 days). Login is rate limited. Every record is checked against the user's sub-account access — records in other sub-accounts return 404.
+- Stripe keys, webhook secrets and SMTP passwords are encrypted at rest with `APP_SECRET` and never sent back to the browser.
 - Public endpoints (`/api/public/*`) are rate limited per IP, and widget chat is also capped per agent per hour to protect your API bill. The widget only works for agents with **Public chat widget** turned on.
 - Rate limits are in-memory, so they reset on restart and aren't shared across multiple server instances.
 
@@ -140,4 +160,4 @@ SQLite + in-memory rate limiting means this MVP is designed for **one server ins
 ## Not included yet
 
 - **App Builder:** one-click production deploys and custom domains for generated apps (download the zip or push to GitHub and deploy anywhere that runs Next.js + Postgres), database browser, per-app environment variables, rolling back database data.
-- **Vs GoHighLevel:** custom domains for sites, multi-user/sub-accounts, CRM contacts/pipelines, calendars with real availability, SMS/email/voice channels, workflow automations, and agent actions (tool calls such as booking or tagging contacts).
+- **Vs GoHighLevel:** custom domains for sites, calendars/booking with real availability, SMS/voice, inbound email replies (two-way inbox), social planner, reputation/reviews, memberships/courses, invoices/estimates, agency SaaS rebilling, and agent actions (tool calls such as booking or tagging contacts from the chat widget).

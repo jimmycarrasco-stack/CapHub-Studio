@@ -1,13 +1,13 @@
 import JSZip from "jszip";
-import { handle, requireAdmin } from "@/lib/http";
+import { appFor } from "@/lib/guards";
+import { handle } from "@/lib/http";
 import { collectFiles } from "@/lib/apps/files";
 import { requireApp } from "@/lib/apps/repo";
 import { slugify } from "@/lib/site-builder";
 
 /** Downloads the project source as a zip (no node_modules, build output or secrets). */
 export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
-  await requireAdmin();
-  const app = requireApp((await ctx.params).id);
+  const { app } = await appFor((await ctx.params).id);
   const slug = slugify(app.name);
   const zip = new JSZip();
   const folder = zip.folder(slug)!;

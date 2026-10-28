@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { handle, HttpError, requireAdmin } from "@/lib/http";
-import { getSite, getSiteVersionHtml, saveSiteHtml } from "@/lib/repo";
+import { siteFor } from "@/lib/guards";
+import { handle, HttpError } from "@/lib/http";
+import { getSiteVersionHtml, saveSiteHtml } from "@/lib/repo";
 
 type Ctx = { params: Promise<{ id: string; versionId: string }> };
 
 async function load(ctx: Ctx) {
-  await requireAdmin();
   const { id, versionId } = await ctx.params;
-  const site = getSite(id);
-  if (!site) throw new HttpError(404, "Site not found");
+  const { site } = await siteFor(id);
   const vid = Number(versionId);
   const html = Number.isInteger(vid) ? getSiteVersionHtml(id, vid) : null;
   if (html === null) throw new HttpError(404, "Version not found");

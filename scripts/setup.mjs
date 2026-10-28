@@ -22,5 +22,5 @@ const out = template
 
 writeFileSync(target, out, { mode: 0o600 });
 console.log(`Created ${target} (permissions 600).`);
-console.log(`Admin password: ${password}`);
-console.log("Change it any time by editing ADMIN_PASSWORD in .env.local and restarting.");
+console.log(`Setup key (ADMIN_PASSWORD): ${password}`);
+console.log("Open the app and go to /setup to create the agency owner account with this key.");

@@ -8,7 +8,9 @@ import path from "node:path";
  * Next.js dev hot-reloads don't open a new handle on every edit).
  */
 
-const MIGRATIONS: string[] = [
+type Migration = string | ((db: Database.Database) => void);
+
+const MIGRATIONS: Migration[] = [
   // 1 — initial schema
   `
   CREATE TABLE settings (
@@ -132,13 +134,242 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_app_snapshots_app ON app_snapshots(app_id, id);
   `,
+  // 3 — CRM: users, agency, sub-accounts (locations) and everything scoped to them
+  (db: Database.Database) => {
+    db.exec(`
+    CREATE TABLE users (
+      id            TEXT PRIMARY KEY,
+      email         TEXT NOT NULL UNIQUE COLLATE NOCASE,
+      name          TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      agency_role   TEXT,                       -- owner | admin | NULL (sub-account users only)
+      created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE locations (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      timezone   TEXT NOT NULL DEFAULT 'America/Winnipeg',
+      email      TEXT NOT NULL DEFAULT '',
+      phone      TEXT NOT NULL DEFAULT '',
+      website    TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE memberships (
+      user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      role        TEXT NOT NULL DEFAULT 'user',  -- admin | user
+      PRIMARY KEY (user_id, location_id)
+    );
+
+    -- Per-sub-account integration settings (secrets encrypted with APP_SECRET).
+    CREATE TABLE location_settings (
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      key         TEXT NOT NULL,
+      value       TEXT NOT NULL,
+      PRIMARY KEY (location_id, key)
+    );
+
+    CREATE TABLE contacts (
+      id          TEXT PRIMARY KEY,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      first_name  TEXT NOT NULL DEFAULT '',
+      last_name   TEXT NOT NULL DEFAULT '',
+      email       TEXT COLLATE NOCASE,
+      phone       TEXT,
+      company     TEXT NOT NULL DEFAULT '',
+      source      TEXT NOT NULL DEFAULT '',
+      custom      TEXT NOT NULL DEFAULT '{}',    -- JSON object of custom fields
+      dnd         INTEGER NOT NULL DEFAULT 0,    -- do not contact (no automated email/SMS)
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_contacts_loc ON contacts(location_id, updated_at);
+    CREATE INDEX idx_contacts_email ON contacts(location_id, email);
+    CREATE INDEX idx_contacts_phone ON contacts(location_id, phone);
+
+    CREATE TABLE contact_tags (
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      contact_id  TEXT NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+      tag         TEXT NOT NULL COLLATE NOCASE,
+      PRIMARY KEY (contact_id, tag)
+    );
+    CREATE INDEX idx_tags_loc ON contact_tags(location_id, tag);
+
+    CREATE TABLE activities (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      contact_id  TEXT REFERENCES contacts(id) ON DELETE CASCADE,
+      type        TEXT NOT NULL,
+      summary     TEXT NOT NULL,
+      data        TEXT,
+      user_id     TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_activities_contact ON activities(contact_id, id);
+    CREATE INDEX idx_activities_loc ON activities(location_id, id);
+
+    CREATE TABLE tasks (
+      id          TEXT PRIMARY KEY,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      contact_id  TEXT REFERENCES contacts(id) ON DELETE CASCADE,
+      title       TEXT NOT NULL,
+      due_at      TEXT,
+      done        INTEGER NOT NULL DEFAULT 0,
+      assignee_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_tasks_loc ON tasks(location_id, done, due_at);
+
+    CREATE TABLE pipelines (
+      id          TEXT PRIMARY KEY,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE stages (
+      id          TEXT PRIMARY KEY,
+      pipeline_id TEXT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      position    INTEGER NOT NULL
+    );
+    CREATE TABLE opportunities (
+      id          TEXT PRIMARY KEY,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      pipeline_id TEXT NOT NULL REFERENCES pipelines(id) ON DELETE CASCADE,
+      stage_id    TEXT NOT NULL REFERENCES stages(id),
+      contact_id  TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+      title       TEXT NOT NULL,
+      value_cents INTEGER NOT NULL DEFAULT 0,
+      status      TEXT NOT NULL DEFAULT 'open',   -- open | won | lost
+      position    REAL NOT NULL DEFAULT 0,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_opps_pipeline ON opportunities(pipeline_id, stage_id, position);
+    CREATE INDEX idx_opps_contact ON opportunities(contact_id);
+
+    CREATE TABLE products (
+      id                TEXT PRIMARY KEY,
+      location_id       TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      name              TEXT NOT NULL,
+      description       TEXT NOT NULL DEFAULT '',
+      price_cents       INTEGER NOT NULL,
+      currency          TEXT NOT NULL DEFAULT 'cad',
+      interval          TEXT,                     -- NULL = one-time | month | year
+      active            INTEGER NOT NULL DEFAULT 1,
+      stripe_product_id TEXT,
+      stripe_price_id   TEXT,
+      sync_error        TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_products_loc ON products(location_id);
+
+    CREATE TABLE orders (
+      id                TEXT PRIMARY KEY,
+      location_id       TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      contact_id        TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+      product_id        TEXT REFERENCES products(id) ON DELETE SET NULL,
+      product_name      TEXT NOT NULL DEFAULT '',
+      amount_cents      INTEGER NOT NULL,
+      currency          TEXT NOT NULL,
+      status            TEXT NOT NULL,             -- paid | refunded
+      kind              TEXT NOT NULL DEFAULT 'one_time', -- one_time | subscription | renewal
+      stripe_ref        TEXT UNIQUE,               -- checkout session / invoice id (idempotency)
+      stripe_payment_intent TEXT,
+      created_at        TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_orders_loc ON orders(location_id, created_at);
+
+    CREATE TABLE crm_messages (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      contact_id  TEXT REFERENCES contacts(id) ON DELETE SET NULL,
+      channel     TEXT NOT NULL,                  -- email | sms
+      direction   TEXT NOT NULL,                  -- out | in
+      to_addr     TEXT NOT NULL,
+      from_addr   TEXT NOT NULL DEFAULT '',
+      subject     TEXT NOT NULL DEFAULT '',
+      body        TEXT NOT NULL,
+      status      TEXT NOT NULL,                  -- sent | failed | received
+      error       TEXT,
+      provider_id TEXT,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_crm_messages_contact ON crm_messages(contact_id, id);
+    CREATE INDEX idx_crm_messages_loc ON crm_messages(location_id, id);
+
+    CREATE TABLE automations (
+      id          TEXT PRIMARY KEY,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      enabled     INTEGER NOT NULL DEFAULT 0,
+      trigger     TEXT NOT NULL,                  -- JSON {type, ...filters}
+      steps       TEXT NOT NULL DEFAULT '[]',     -- JSON array of actions
+      hook_secret TEXT NOT NULL,                  -- for the inbound webhook trigger URL
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_automations_loc ON automations(location_id);
+
+    CREATE TABLE automation_runs (
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      automation_id TEXT NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+      location_id   TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      contact_id    TEXT REFERENCES contacts(id) ON DELETE CASCADE,
+      status        TEXT NOT NULL,                -- active | done | failed | cancelled
+      step_index    INTEGER NOT NULL DEFAULT 0,
+      next_run_at   TEXT NOT NULL,
+      context       TEXT NOT NULL DEFAULT '{}',
+      log           TEXT NOT NULL DEFAULT '[]',
+      created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_runs_due ON automation_runs(status, next_run_at);
+    CREATE INDEX idx_runs_automation ON automation_runs(automation_id, id);
+
+    CREATE TABLE funnels (
+      id          TEXT PRIMARY KEY,
+      location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL,
+      slug        TEXT NOT NULL UNIQUE,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE funnel_steps (
+      funnel_id TEXT NOT NULL REFERENCES funnels(id) ON DELETE CASCADE,
+      site_id   TEXT NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+      position  INTEGER NOT NULL,
+      PRIMARY KEY (funnel_id, site_id)
+    );
+
+    ALTER TABLE sites ADD COLUMN location_id TEXT REFERENCES locations(id) ON DELETE CASCADE;
+    ALTER TABLE sites ADD COLUMN pending_prompt TEXT;
+    ALTER TABLE agents ADD COLUMN location_id TEXT REFERENCES locations(id) ON DELETE CASCADE;
+    ALTER TABLE apps ADD COLUMN location_id TEXT REFERENCES locations(id) ON DELETE CASCADE;
+    ALTER TABLE form_submissions ADD COLUMN contact_id TEXT REFERENCES contacts(id) ON DELETE SET NULL;
+    `);
+
+    // Existing sites, agents and apps move into a first sub-account.
+    const counts = ["sites", "agents", "apps"].map((t) => (db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n);
+    if (counts.some((n) => n > 0)) {
+      const id = "main" + Math.random().toString(36).slice(2, 8);
+      db.prepare("INSERT INTO locations (id, name) VALUES (?, 'Main account')").run(id);
+      for (const t of ["sites", "agents", "apps"]) db.prepare(`UPDATE ${t} SET location_id = ?`).run(id);
+    }
+  },
 ];
+
+export const MIGRATIONS_FOR_TESTS = MIGRATIONS;
 
 export function migrate(db: Database.Database) {
   const current = db.pragma("user_version", { simple: true }) as number;
   for (let i = current; i < MIGRATIONS.length; i++) {
     db.transaction(() => {
-      db.exec(MIGRATIONS[i]);
+      const m = MIGRATIONS[i];
+      if (typeof m === "string") db.exec(m);
+      else m(db);
       db.pragma(`user_version = ${i + 1}`);
     })();
   }

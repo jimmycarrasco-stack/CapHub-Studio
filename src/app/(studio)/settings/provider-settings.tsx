@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { api, Badge, Button, Card, cx, Field, Input, PageHeader, toast } from "@/components/ui";
+import { api, Badge, Button, Card, cx, Field, Input, toast } from "@/components/ui";
 import { ENV_KEYS, MODEL_SUGGESTIONS, PROVIDER_LABELS, PROVIDERS, type ProviderName } from "@/lib/llm/catalog";
 import type { AiSettings } from "@/lib/settings";
 import { RuntimeSettings } from "./runtime-settings";
@@ -64,11 +64,10 @@ export function ProviderSettings({ initial }: { initial: AiSettings }) {
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-6 md:p-10">
-      <PageHeader
-        title="AI Providers"
-        subtitle="Choose which provider powers the Site Builder and agents. Switch any time — the change applies to the next request."
-      />
+    <div>
+      <p className="mb-4 text-sm text-zinc-500">
+        Agency-wide: choose which provider powers the AI Guide, Site Builder, App Builder, agents and AI-written emails in every sub-account. Switch any time — the change applies to the next request.
+      </p>
 
       <Card className="mb-6 p-4">
         <div className="mb-3 text-[13px] font-medium text-zinc-700">Active provider</div>

@@ -22,7 +22,7 @@ type StreamEvent = {
 export function toAnthropicMessages(messages: AgentMessage[]) {
   const out: { role: "user" | "assistant"; content: unknown }[] = messages.map((m) => {
     if (m.role === "user") return { role: "user", content: [{ type: "text", text: m.content }] };
-    if (m.role === "assistant") return { role: "assistant", content: m.raw };
+    if (m.role === "assistant") return { role: "assistant", content: m.raw ?? [{ type: "text", text: m.text || "(no reply)" }] };
     return {
       role: "user",
       content: m.results.map((r) => ({ type: "tool_result", tool_use_id: r.id, content: r.output || "(no output)", is_error: !!r.isError })),

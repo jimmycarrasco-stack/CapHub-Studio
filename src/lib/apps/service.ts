@@ -9,8 +9,8 @@ import { appState, dropAppDatabase, removeContainer, restartApp } from "./runtim
 
 /** High-level app operations used by the API routes. */
 
-export async function createApp(name: string) {
-  const app = createAppRow(name);
+export async function createApp(name: string, locationId: string) {
+  const app = createAppRow(name, locationId);
   try {
     await createWorkspaceFromTemplate(app.id, path.join(templatesDir(), app.template));
     // Name the app in the template so the first preview isn't "My App".

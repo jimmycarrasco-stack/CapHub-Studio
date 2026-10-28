@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { handle, HttpError, requireAdmin } from "@/lib/http";
+import { siteFor } from "@/lib/guards";
+import { handle, HttpError } from "@/lib/http";
 import { getSite, listSubmissions } from "@/lib/repo";
 
 function csvCell(raw: string) {
@@ -10,10 +11,8 @@ function csvCell(raw: string) {
 
 /** Lists form submissions. `?format=csv` downloads them. */
 export const GET = handle(async (req: Request, ctx: { params: Promise<{ id: string }> }) => {
-  await requireAdmin();
   const { id } = await ctx.params;
-  const site = getSite(id);
-  if (!site) throw new HttpError(404, "Site not found");
+  const { site } = await siteFor(id);
   const rows = listSubmissions(id);
 
   if (new URL(req.url).searchParams.get("format") === "csv") {

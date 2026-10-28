@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { handle, requireAdmin } from "@/lib/http";
+import { appFor } from "@/lib/guards";
+import { handle } from "@/lib/http";
 import { isRunning } from "@/lib/apps/jobs";
 import { ensurePreviewProxy } from "@/lib/apps/preview-proxy";
 import { requireApp } from "@/lib/apps/repo";
@@ -7,8 +8,7 @@ import { appState, internalOrigin } from "@/lib/apps/runtime";
 
 /** Container state + whether the dev server answers. Polled by the workspace UI. */
 export const GET = handle(async (_req: Request, ctx: { params: Promise<{ id: string }> }) => {
-  await requireAdmin();
-  const app = requireApp((await ctx.params).id);
+  const { app } = await appFor((await ctx.params).id);
   const state = await appState(app.id);
   let ready = false;
   let proxyError: string | null = null;

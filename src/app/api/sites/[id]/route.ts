@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handle, HttpError, parseBody, requireAdmin } from "@/lib/http";
+import { siteFor } from "@/lib/guards";
+import { handle, HttpError, parseBody } from "@/lib/http";
 import { deleteSite, getAgent, getSite, listSiteMessages, saveSiteHtml, updateSite } from "@/lib/repo";
 
 type Ctx = { params: Promise<{ id: string }> };
 
 async function load(ctx: Ctx) {
-  await requireAdmin();
   const { id } = await ctx.params;
-  const site = getSite(id);
-  if (!site) throw new HttpError(404, "Site not found");
+  const { site } = await siteFor(id);
   return site;
 }
 

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { handle, parseBody, requireAdmin } from "@/lib/http";
+import { requireCtx } from "@/lib/auth";
+import { handle, parseBody } from "@/lib/http";
 import { createAgent, listAgents } from "@/lib/repo";
 
 export const GET = handle(async () => {
-  await requireAdmin();
-  return NextResponse.json(listAgents());
+  const { location } = await requireCtx();
+  return NextResponse.json(listAgents(location.id));
 });
 
 export const POST = handle(async (req: Request) => {
-  await requireAdmin();
+  const { location } = await requireCtx();
   const body = await parseBody(
     req,
     z.object({
@@ -18,5 +19,5 @@ export const POST = handle(async (req: Request) => {
       instructions: z.string().max(20_000).optional(),
     }),
   );
-  return NextResponse.json(createAgent(body), { status: 201 });
+  return NextResponse.json(createAgent(location.id, body), { status: 201 });
 });

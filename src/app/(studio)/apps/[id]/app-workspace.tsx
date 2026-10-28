@@ -415,7 +415,7 @@ export function AppWorkspace({ initialApp, initialMessages, initiallyWorking }: 
                         Start app
                       </Button>
                     )}
-                    <p className="text-xs text-zinc-500">Needs Docker running on this computer (Settings → AI Providers shows its status).</p>
+                    <p className="text-xs text-zinc-500">Needs Docker running on this computer (Settings → AI & runtime shows its status).</p>
                   </div>
                 </div>
               ))}

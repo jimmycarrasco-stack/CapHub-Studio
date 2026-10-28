@@ -5,13 +5,16 @@ const SECRET = "x".repeat(40);
 
 describe("session tokens", () => {
   it("verifies a fresh token and rejects tampering, wrong secret and expiry", async () => {
-    const t = await createSessionToken(SECRET, 1_000);
-    expect(await verifySessionToken(t, SECRET, 2_000)).toBe(true);
-    expect(await verifySessionToken(t, "y".repeat(40), 2_000)).toBe(false);
-    expect(await verifySessionToken(t.replace(/^\d+/, "9999999999999"), SECRET, 2_000)).toBe(false);
-    expect(await verifySessionToken(t, SECRET, 1_000 + SESSION_TTL_MS + 1)).toBe(false);
-    expect(await verifySessionToken(undefined, SECRET)).toBe(false);
-    expect(await verifySessionToken("garbage", SECRET)).toBe(false);
+    const t = await createSessionToken(SECRET, "user_1", 1_000);
+    expect(await verifySessionToken(t, SECRET, 2_000)).toBe("user_1");
+    expect(await verifySessionToken(t, "y".repeat(40), 2_000)).toBeNull();
+    // Swapping in another user's id invalidates the signature.
+    const [, sig] = t.split(".");
+    const forged = Buffer.from(JSON.stringify({ u: "admin", e: 9_999_999_999_999 })).toString("base64url");
+    expect(await verifySessionToken(`${forged}.${sig}`, SECRET, 2_000)).toBeNull();
+    expect(await verifySessionToken(t, SECRET, 1_000 + SESSION_TTL_MS + 1)).toBeNull();
+    expect(await verifySessionToken(undefined, SECRET)).toBeNull();
+    expect(await verifySessionToken("garbage", SECRET)).toBeNull();
   });
 
   it("compares passwords", async () => {

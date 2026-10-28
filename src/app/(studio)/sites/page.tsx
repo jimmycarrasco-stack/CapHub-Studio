@@ -1,16 +1,20 @@
 import Link from "next/link";
+import { BuildTabs } from "@/components/build-tabs";
 import { Badge, PageHeader } from "@/components/ui";
 import { timeAgo } from "@/lib/format";
+import { pageCtx } from "@/lib/page-ctx";
 import { listSites } from "@/lib/repo";
 import { NewSiteForm } from "./new-site-form";
 
 export const metadata = { title: "Site Builder" };
 
-export default function SitesPage() {
-  const sites = listSites();
+export default async function SitesPage() {
+  const ctx = await pageCtx();
+  const sites = listSites(ctx.location.id);
   return (
     <div className="mx-auto max-w-6xl p-6 md:p-10">
-      <PageHeader title="Site Builder" subtitle="Describe a website, landing page, funnel step or form — AI builds it, you refine it in chat or code." />
+      <PageHeader title="Sites & Funnels" subtitle="Describe a website, landing page, funnel step or form — AI builds it, you refine it in chat or code. Forms add contacts to your CRM." />
+      <BuildTabs active="sites" />
       <NewSiteForm />
 
       <h2 className="mt-10 mb-3 text-sm font-semibold text-zinc-900">Your sites</h2>
