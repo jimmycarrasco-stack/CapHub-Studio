@@ -1,7 +1,7 @@
 import "server-only";
 import type { ToolDef } from "../llm/types";
 import { clip } from "./docker";
-import { deletePath, editFile, formatTree, listTree, readFile, searchFiles, writeFile } from "./files";
+import { deletePath, editFile, formatTree, listTree, readFile, searchFiles, writeFile } from "./workspace";
 import { appLogs, checkPage, execInApp, restartApp, waitForHttp } from "./runtime";
 import { requireApp } from "./repo";
 

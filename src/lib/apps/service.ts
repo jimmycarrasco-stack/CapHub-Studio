@@ -5,7 +5,7 @@ import { HttpError } from "../errors";
 import { appsRoot, templatesDir } from "./config";
 import { createWorkspaceFromTemplate, deleteSnapshotFiles, restoreSnapshot, saveSnapshot } from "./files";
 import { createAppRow, deleteAppRow, getSnapshot, insertSnapshot, pruneSnapshots, requireApp, setSnapshotFiles } from "./repo";
-import { dropAppDatabase, removeContainer } from "./runtime";
+import { appState, dropAppDatabase, removeContainer, restartApp } from "./runtime";
 
 /** High-level app operations used by the API routes. */
 
@@ -39,6 +39,8 @@ export async function restoreAppSnapshot(appId: string, snapshotId: number) {
   const snap = getSnapshot(appId, snapshotId);
   if (!snap) throw new HttpError(404, "Version not found");
   await restoreSnapshot(appId, snapshotId);
+  // Many files changed on the host at once: restart so the dev server rescans them (see workspace.ts).
+  if ((await appState(appId)) === "running") await restartApp(appId);
   return takeSnapshot(appId, `Restored: ${snap.note}`);
 }
 

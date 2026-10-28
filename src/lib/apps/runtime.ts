@@ -300,6 +300,11 @@ export async function checkPage(appId: string, pagePath: string) {
     .replace(/\s+/g, " ")
     .trim();
   const lines = [`GET ${p} → ${status}${location ? ` (redirect to ${location})` : ""}`];
+  if (location && /\/login/.test(location)) {
+    lines.push(
+      "Note: this page requires sign-in, so it was NOT compiled or rendered by this check. Verify it with `npm run typecheck` and get_logs, and check any public pages that use the same components.",
+    );
+  }
   if (title) lines.push(`Title: ${title}`);
   if (status >= 500 || /Unhandled Runtime Error|Build Error|Failed to compile|Module not found/i.test(body)) {
     lines.push("The page errored. Recent server logs:", clip((await appLogs(appId, 60)).trim(), 6000));

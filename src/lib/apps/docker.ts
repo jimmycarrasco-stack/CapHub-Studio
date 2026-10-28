@@ -14,15 +14,19 @@ const MAX_CAPTURE = 2_000_000;
  * Runs the docker CLI (works with Docker Desktop, Colima and OrbStack, which all provide `docker`).
  * Never uses a shell on the host: arguments are passed as an array.
  */
-export function docker(args: string[], opts: { timeoutMs?: number; signal?: AbortSignal } = {}): Promise<ExecResult> {
+export function docker(args: string[], opts: { timeoutMs?: number; signal?: AbortSignal; input?: string } = {}): Promise<ExecResult> {
   return new Promise((resolve) => {
-    const child = spawn("docker", args, { stdio: ["ignore", "pipe", "pipe"], env: process.env });
+    const child = spawn("docker", args, { stdio: [opts.input !== undefined ? "pipe" : "ignore", "pipe", "pipe"], env: process.env });
+    if (opts.input !== undefined && child.stdin) {
+      child.stdin.on("error", () => {}); // process may exit before reading everything
+      child.stdin.end(opts.input, "utf8");
+    }
     let stdout = "";
     let stderr = "";
     let timedOut = false;
     const cap = (cur: string, chunk: Buffer) => (cur.length > MAX_CAPTURE ? cur : cur + chunk.toString("utf8"));
-    child.stdout.on("data", (c: Buffer) => (stdout = cap(stdout, c)));
-    child.stderr.on("data", (c: Buffer) => (stderr = cap(stderr, c)));
+    child.stdout?.on("data", (c: Buffer) => (stdout = cap(stdout, c)));
+    child.stderr?.on("data", (c: Buffer) => (stderr = cap(stderr, c)));
 
     const kill = () => child.kill("SIGKILL");
     const timer = opts.timeoutMs ? setTimeout(() => ((timedOut = true), kill()), opts.timeoutMs) : null;

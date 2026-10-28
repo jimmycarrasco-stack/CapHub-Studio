@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { handle, HttpError, parseBody, requireAdmin } from "@/lib/http";
-import { deletePath, listTree, readFile, writeFile } from "@/lib/apps/files";
+import { deletePath, listTree, readFile, writeFile } from "@/lib/apps/workspace";
 import { isRunning } from "@/lib/apps/jobs";
 import { requireApp } from "@/lib/apps/repo";
 import { takeSnapshot } from "@/lib/apps/service";
