@@ -43,6 +43,19 @@ describe("contacts", () => {
     expect(() => contacts.createContact(loc.id, {})).toThrow(/at least/);
   });
 
+  it("bulk-deletes only this sub-account's contacts and matches filters", async () => {
+    const { contacts, loc, other } = await setup();
+    const a = contacts.createContact(loc.id, { email: "a@x.com", tags: ["old"] });
+    const b = contacts.createContact(loc.id, { email: "b@x.com", tags: ["old"] });
+    const keep = contacts.createContact(loc.id, { email: "keep@x.com" });
+    const foreign = contacts.createContact(other.id, { email: "f@x.com", tags: ["old"] });
+    expect(contacts.matchingContactIds(loc.id, { tag: "old" }).sort()).toEqual([a.id, b.id].sort());
+    expect(contacts.bulkDeleteContacts(loc.id, [a.id, b.id, foreign.id])).toBe(2);
+    expect(contacts.getContact(foreign.id)).not.toBeNull();
+    expect(contacts.getContact(keep.id)).not.toBeNull();
+    expect(contacts.listContacts(loc.id).total).toBe(1);
+  });
+
   it("upsert fills missing fields without overwriting", async () => {
     const { contacts, loc } = await setup();
     contacts.createContact(loc.id, { first_name: "Ana", email: "ana@x.com" });

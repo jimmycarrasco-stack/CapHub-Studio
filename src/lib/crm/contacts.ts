@@ -70,7 +70,12 @@ export function normalizeEmail(e: string | null | undefined) {
   return clean(e)?.toLowerCase() ?? null;
 }
 
-export function listContacts(locationId: string, opts: { q?: string; tag?: string; limit?: number; offset?: number } = {}) {
+export interface ContactFilter {
+  q?: string;
+  tag?: string;
+}
+
+function contactWhere(locationId: string, opts: ContactFilter) {
   const where = ["c.location_id = ?"];
   const args: unknown[] = [locationId];
   if (opts.q?.trim()) {
@@ -82,6 +87,11 @@ export function listContacts(locationId: string, opts: { q?: string; tag?: strin
     where.push("EXISTS (SELECT 1 FROM contact_tags t WHERE t.contact_id = c.id AND t.tag = ?)");
     args.push(opts.tag);
   }
+  return { where, args };
+}
+
+export function listContacts(locationId: string, opts: ContactFilter & { limit?: number; offset?: number } = {}) {
+  const { where, args } = contactWhere(locationId, opts);
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 500);
   const offset = Math.max(opts.offset ?? 0, 0);
   const total = (
@@ -204,6 +214,22 @@ export function upsertContact(locationId: string, input: ContactInput & { source
 
 export function deleteContact(id: string) {
   db().prepare("DELETE FROM contacts WHERE id = ?").run(id);
+}
+
+/** Ids of every contact matching a search/tag filter (for "select all matching"). */
+export function matchingContactIds(locationId: string, filter: ContactFilter): string[] {
+  const { where, args } = contactWhere(locationId, filter);
+  return (db().prepare(`SELECT c.id FROM contacts c WHERE ${where.join(" AND ")}`).all(...args) as { id: string }[]).map((r) => r.id);
+}
+
+/** Deletes many contacts at once (only ones in this sub-account). Returns how many were deleted. */
+export function bulkDeleteContacts(locationId: string, ids: string[]): number {
+  const stmt = db().prepare("DELETE FROM contacts WHERE id = ? AND location_id = ?");
+  let n = 0;
+  db().transaction(() => {
+    for (const id of ids) n += stmt.run(id, locationId).changes;
+  })();
+  return n;
 }
 
 export function touchContact(id: string) {
