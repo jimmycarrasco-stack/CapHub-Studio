@@ -234,7 +234,7 @@ async function aiWriteEmail(locationId: string, contactId: string | null, instru
   const text = await provider.complete({
     system:
       "You write short, warm, professional emails on behalf of a small business. Reply with the subject on the first line as `Subject: ...`, " +
-      "a blank line, then the plain-text body (no markdown, no placeholders, sign off with the business name). Never invent facts, prices or promises not in the instructions.",
+      "a blank line, then the body in plain text (no placeholders, sign off with the business name). For links use [link text](https://url) and for one main call-to-action button use [[Button text|https://url]] on its own line — only with URLs given in the instructions. Never invent facts, prices, links or promises not in the instructions.",
     messages: [
       {
         role: "user",
@@ -271,17 +271,21 @@ async function execStep(
     case "send_email": {
       const c = needContact();
       if (!c.email) return { ok: false, message: "Contact has no email address — skipped" };
-      const { subject, body } = step.ai
+      const written = step.ai
         ? await aiWriteEmail(loc, c.id, renderTemplate(step.aiInstructions || step.body, vars))
         : {
             subject: renderTemplate(step.subject, vars),
             body: renderTemplate(step.body, vars),
           };
+      // A subject typed in the step wins over the AI's.
+      const subject = step.ai && step.subject.trim() ? renderTemplate(step.subject, vars) : written.subject;
+      const body = written.body;
       const r = await sendEmail(loc, {
         to: c.email,
         subject,
         body,
         contactId: c.id,
+        attachments: step.attachments,
       });
       return {
         ok: r.ok,

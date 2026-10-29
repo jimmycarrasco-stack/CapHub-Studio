@@ -23,6 +23,14 @@ export function normalizeError(label: string, err: unknown): Error {
   const status = (err as { status?: number })?.status;
   const raw = err instanceof Error ? err.message : String(err);
   let hint = "";
+  // Out of prepaid credit / quota: say so plainly instead of dumping the provider's JSON.
+  if (/credit balance is too low|insufficient_quota|exceeded your current quota|billing/i.test(raw)) {
+    const where = label.toLowerCase().includes("openai") ? "platform.openai.com → Billing" : "console.anthropic.com → Plans & Billing";
+    return new HttpError(
+      402,
+      `${label} account is out of credit, so AI features can't run. Add credits at ${where}, or switch to another provider in Settings → AI & runtime.`,
+    );
+  }
   if (status === 401) hint = " — the API key was rejected. Check it in Settings → AI & runtime.";
   else if (status === 404) hint = " — model not found. Check the model ID in Settings → AI & runtime.";
   else if (status === 429) hint = " — rate limited or out of credit.";

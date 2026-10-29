@@ -9,6 +9,7 @@ import type { MessageRow } from "@/lib/crm/email";
 import type { Order } from "@/lib/crm/payments";
 import type { Opportunity } from "@/lib/crm/pipelines";
 import type { Run } from "@/lib/crm/automations";
+import { EmailComposer } from "@/components/email-composer";
 import { TaskList } from "../task-list";
 
 type Deal = Opportunity & { pipeline_name: string; stage_name: string };
@@ -315,14 +316,16 @@ function ActivityTab({ contactId, activities, onChange }: { contactId: string; a
 function EmailTab({ contact: c, messages, ready, onSent }: { contact: Contact; messages: MessageRow[]; ready: boolean; onSent: () => void }) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [attachments, setAttachments] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   async function send() {
     setBusy(true);
     try {
-      await api(`/api/contacts/${c.id}/email`, { method: "POST", json: { subject, body } });
+      await api(`/api/contacts/${c.id}/email`, { method: "POST", json: { subject, body, attachments } });
       toast("Email sent", "success");
       setSubject("");
       setBody("");
+      setAttachments([]);
       onSent();
     } catch (e) {
       toast((e as Error).message, "error");
@@ -348,9 +351,8 @@ function EmailTab({ contact: c, messages, ready, onSent }: { contact: Contact; m
             {c.dnd && <span className="ml-2 text-red-600">This contact is marked do-not-contact; the email will be blocked.</span>}
           </div>
           <Input aria-label="Subject" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
-          <Textarea aria-label="Message" rows={7} placeholder={"Hi {{contact.first_name}},\n\n…"} value={body} onChange={(e) => setBody(e.target.value)} />
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-zinc-400">Merge fields: {"{{contact.first_name}}"}, {"{{business.name}}"}</span>
+          <EmailComposer body={body} onBodyChange={setBody} attachments={attachments} onAttachmentsChange={setAttachments} rows={7} placeholder={"Hi {{contact.first_name}},\n\n…"} />
+          <div className="flex items-center justify-end">
             <Button variant="primary" loading={busy} disabled={!subject.trim() || !body.trim()} onClick={send}>
               Send email
             </Button>
@@ -385,6 +387,15 @@ export function MessageList({ messages, showContact }: { messages: MessageRow[];
             <div className="border-t border-zinc-100 bg-zinc-50 px-4 py-3 text-sm whitespace-pre-wrap text-zinc-700">
               {m.error && <p className="mb-2 text-xs text-red-600">Error: {m.error}</p>}
               {m.body}
+              {m.attachments?.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {m.attachments.map((a) => (
+                    <a key={a.id} href={`/api/files/${a.id}`} className="rounded bg-white px-2 py-0.5 text-xs text-zinc-700 ring-1 ring-zinc-200 hover:text-brand-700">
+                      📎 {a.name}
+                    </a>
+                  ))}
+                </div>
+              )}
               {showContact && m.contact_id && (
                 <Link href={`/contacts/${m.contact_id}`} className="mt-3 block text-xs font-medium text-brand-600 hover:underline">
                   Open contact →

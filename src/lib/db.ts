@@ -359,6 +359,30 @@ const MIGRATIONS: Migration[] = [
       for (const t of ["sites", "agents", "apps"]) db.prepare(`UPDATE ${t} SET location_id = ?`).run(id);
     }
   },
+  // 4: email attachments (files library per sub-account) + starter pipeline for sub-accounts without one
+  (db) => {
+    db.exec(`
+      CREATE TABLE crm_files (
+        id          TEXT PRIMARY KEY,
+        location_id TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+        name        TEXT NOT NULL,
+        mime        TEXT NOT NULL,
+        size        INTEGER NOT NULL,
+        created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX idx_crm_files_loc ON crm_files(location_id, created_at);
+      ALTER TABLE crm_messages ADD COLUMN attachments TEXT;
+    `);
+    const empty = db.prepare("SELECT id FROM locations l WHERE NOT EXISTS (SELECT 1 FROM pipelines p WHERE p.location_id = l.id)").all() as { id: string }[];
+    const stages = ["New lead", "Contacted", "Proposal sent", "Negotiation", "Closed"];
+    for (const l of empty) {
+      const pid = "p" + Math.random().toString(36).slice(2, 11);
+      db.prepare("INSERT INTO pipelines (id, location_id, name) VALUES (?, ?, 'Sales pipeline')").run(pid, l.id);
+      stages.forEach((name, i) =>
+        db.prepare("INSERT INTO stages (id, pipeline_id, name, position) VALUES (?, ?, ?, ?)").run("s" + Math.random().toString(36).slice(2, 11), pid, name, i),
+      );
+    }
+  },
 ];
 
 export const MIGRATIONS_FOR_TESTS = MIGRATIONS;

@@ -115,6 +115,7 @@ export const stepSchema = z.discriminatedUnion("type", [
     body: z.string().max(20_000).default(""),
     ai: z.boolean().default(false),
     aiInstructions: z.string().max(4000).default(""),
+    attachments: z.array(z.string().max(40)).max(10).default([]),
   }),
   z.object({
     type: z.literal("notify_team"),

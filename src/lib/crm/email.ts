@@ -4,6 +4,8 @@ import { db } from "../db";
 import { HttpError } from "../errors";
 import { getLocation } from "../auth";
 import { addActivity, getContact, touchContact } from "./contacts";
+import { renderEmailHtml, renderEmailText } from "./email-format";
+import { resolveAttachments } from "./files";
 import { getLocSetting, secretHint } from "./location-settings";
 
 /**
@@ -101,14 +103,6 @@ export function mergeVars(contactId: string | null, extra: Record<string, unknow
   };
 }
 
-function textToHtml(text: string) {
-  const esc = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  return `<div style="font-family:system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.55;color:#18181b">${esc
-    .split(/\n{2,}/)
-    .map((p) => `<p style="margin:0 0 14px">${p.replace(/\n/g, "<br>")}</p>`)
-    .join("")}</div>`;
-}
-
 /**
  * Sends a plain-text email (rendered to simple HTML) and logs it. Never throws for delivery
  * failures — the result says what happened and the failure is logged on the contact.
@@ -122,16 +116,26 @@ export async function sendEmail(
     contactId?: string | null;
     userId?: string;
     skipDnd?: boolean;
+    /** File ids from this sub-account's files library. */
+    attachments?: string[];
   },
 ): Promise<{ ok: boolean; error?: string; messageId?: number }> {
+  let files: ReturnType<typeof resolveAttachments> = [];
+  let attachError: string | null = null;
+  try {
+    files = resolveAttachments(locationId, input.attachments);
+  } catch (err) {
+    attachError = (err as Error).message;
+  }
+  const attachmentsJson = files.length ? JSON.stringify(files.map((f) => ({ id: f.id, name: f.name, size: f.size }))) : null;
   const contact = input.contactId ? getContact(input.contactId) : null;
   const log = (status: "sent" | "failed", error: string | null, providerId: string | null, from: string) => {
     const r = db()
       .prepare(
-        `INSERT INTO crm_messages (location_id, contact_id, channel, direction, to_addr, from_addr, subject, body, status, error, provider_id)
-         VALUES (?, ?, 'email', 'out', ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO crm_messages (location_id, contact_id, channel, direction, to_addr, from_addr, subject, body, status, error, provider_id, attachments)
+         VALUES (?, ?, 'email', 'out', ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(locationId, input.contactId ?? null, input.to, from, input.subject, input.body, status, error, providerId);
+      .run(locationId, input.contactId ?? null, input.to, from, input.subject, input.body, status, error, providerId, attachmentsJson);
     if (input.contactId) {
       addActivity(
         locationId,
@@ -153,6 +157,7 @@ export async function sendEmail(
       messageId: log("failed", "Contact is marked Do Not Contact", null, ""),
     };
   }
+  if (attachError) return { ok: false, error: attachError, messageId: log("failed", attachError, null, "") };
   const c = getSmtp(locationId);
   if (!c)
     return {
@@ -166,8 +171,9 @@ export async function sendEmail(
       from,
       to: input.to,
       subject: input.subject,
-      text: input.body,
-      html: textToHtml(input.body),
+      text: renderEmailText(input.body),
+      html: renderEmailHtml(input.body),
+      attachments: files.map((f) => ({ filename: f.name, path: f.path, contentType: f.mime })),
     });
     return {
       ok: true,
@@ -194,6 +200,7 @@ export interface MessageRow {
   body: string;
   status: string;
   error: string | null;
+  attachments: { id: string; name: string; size: number }[];
   created_at: string;
 }
 
@@ -204,11 +211,14 @@ export function listMessages(locationId: string, opts: { contactId?: string; lim
     where.push("m.contact_id = ?");
     args.push(opts.contactId);
   }
-  return db()
+  return (db()
     .prepare(
       `SELECT m.id, m.contact_id, TRIM(c.first_name || ' ' || c.last_name) AS contact_name, m.channel, m.direction, m.to_addr, m.subject,
-         m.body, m.status, m.error, m.created_at
+         m.body, m.status, m.error, m.attachments, m.created_at
        FROM crm_messages m LEFT JOIN contacts c ON c.id = m.contact_id WHERE ${where.join(" AND ")} ORDER BY m.id DESC LIMIT ?`,
     )
-    .all(...args, opts.limit ?? 200) as MessageRow[];
+    .all(...args, opts.limit ?? 200) as (Omit<MessageRow, "attachments"> & { attachments: string | null })[]).map((m) => ({
+    ...m,
+    attachments: m.attachments ? JSON.parse(m.attachments) : [],
+  }));
 }

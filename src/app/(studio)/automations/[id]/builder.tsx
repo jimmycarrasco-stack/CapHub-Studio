@@ -6,6 +6,7 @@ import { useState } from "react";
 import { api, Button, Card, cx, Field, Input, Modal, Select, Textarea, timeAgo, toast, Toggle } from "@/components/ui";
 import { STEPS, TRIGGERS, type Step, type StepType, type Trigger, type TriggerType } from "@/lib/crm/automation-defs";
 import type { Automation, Run } from "@/lib/crm/automations";
+import { EmailComposer } from "@/components/email-composer";
 import { RunStatus } from "../../contacts/[id]/contact-view";
 
 interface Options {
@@ -36,7 +37,7 @@ function defaultStep(type: StepType, o: Options): Step {
   const p = o.pipelines[0];
   switch (type) {
     case "send_email":
-      return { type, subject: "", body: "Hi {{contact.first_name}},\n\n", ai: false, aiInstructions: "" };
+      return { type, subject: "", body: "Hi {{contact.first_name}},\n\n", ai: false, aiInstructions: "", attachments: [] };
     case "notify_team":
       return { type, to: "", subject: "New activity: {{contact.name}}", body: "{{contact.name}} ({{contact.email}}) just triggered this automation." };
     case "add_tag":
@@ -410,11 +411,15 @@ function StepEditor({ step: s, onChange, options }: { step: Step; onChange: (s: 
           <Field label="Subject">
             <Input aria-label="Subject" value={s.subject} onChange={(e) => onChange({ ...s, subject: e.target.value })} placeholder={s.ai ? "(AI writes one if empty)" : "Thanks for reaching out, {{contact.first_name}}"} />
           </Field>
-          {!s.ai && (
-            <Field label="Message" hint="Merge fields: {{contact.first_name}}, {{contact.last_name}}, {{contact.name}}, {{contact.email}}, {{business.name}}">
-              <Textarea aria-label="Message" rows={6} value={s.body} onChange={(e) => onChange({ ...s, body: e.target.value })} />
-            </Field>
-          )}
+          <EmailComposer
+            body={s.body}
+            onBodyChange={(body) => onChange({ ...s, body })}
+            attachments={s.attachments ?? []}
+            onAttachmentsChange={(attachments) => onChange({ ...s, attachments })}
+            attachmentsOnly={s.ai}
+            placeholder={"Hi {{contact.first_name}},\n\n…"}
+          />
+          {s.ai && <p className="text-xs text-zinc-500">Tip: put any links you want in the instructions (e.g. your booking page) — AI adds them as links or a button.</p>}
         </div>
       );
     case "notify_team":
