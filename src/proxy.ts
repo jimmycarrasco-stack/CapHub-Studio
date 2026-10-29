@@ -16,7 +16,7 @@ const PUBLIC_PREFIXES = [
   "/api/webhooks/", // Stripe, Twilio
   "/api/hooks/", // automation inbound webhooks
 ];
-const PUBLIC_FILES = ["/widget.js", "/caphub-runtime.js", "/favicon.ico"];
+const PUBLIC_FILES = ["/widget.js", "/caphub-runtime.js", "/favicon.ico", "/sw.js"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;

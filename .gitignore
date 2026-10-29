@@ -15,3 +15,6 @@ data/*.db-*
 .DS_Store
 npm-debug.log*
 coverage/
+
+# Local backups made by the update script
+backups/
