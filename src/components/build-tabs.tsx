@@ -2,13 +2,14 @@ import Link from "next/link";
 import { cx } from "@/lib/format";
 
 /** Sites / Funnels switcher shown at the top of both pages. */
-export function BuildTabs({ active }: { active: "sites" | "funnels" }) {
+export function BuildTabs({ active }: { active: "sites" | "funnels" | "domains" }) {
   return (
     <div className="mb-6 flex gap-1 border-b border-zinc-200">
       {(
         [
           ["sites", "/sites", "Sites & pages"],
           ["funnels", "/funnels", "Funnels"],
+          ["domains", "/domains", "Domains"],
         ] as const
       ).map(([k, href, label]) => (
         <Link

@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { getLocation } from "@/lib/auth";
 import { formatMoney, recordCheckoutSession, stripeFor } from "@/lib/crm/payments";
+import { isOwnDomainUrl } from "@/lib/crm/domains";
 import { provisionFromOrder } from "@/lib/crm/saas";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export default async function PaySuccess({ searchParams }: { searchParams: Promi
   }
 
   // Funnels: continue to the next step (only same-site URLs).
-  const next = ok && sp.return && sp.return.startsWith(`${origin}/f/`) ? sp.return : null;
+  const next = ok && sp.return && (sp.return.startsWith(`${origin}/f/`) || (loc && isOwnDomainUrl(loc.id, sp.return))) ? sp.return : null;
 
   return (
     <main className="grid min-h-full place-items-center bg-zinc-50 p-6">

@@ -398,6 +398,18 @@ const MIGRATIONS: Migration[] = [
       used_at    TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+  `,  // 6: custom domains for sites and funnels
+  `
+    CREATE TABLE site_domains (
+      domain       TEXT PRIMARY KEY,                -- lowercase hostname, e.g. book.acme.com
+      location_id  TEXT NOT NULL REFERENCES locations(id) ON DELETE CASCADE,
+      target_type  TEXT NOT NULL,                   -- site | funnel
+      target_id    TEXT NOT NULL,
+      verify_token TEXT NOT NULL,
+      verified_at  TEXT,
+      created_at   TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX idx_site_domains_loc ON site_domains(location_id);
   `,
 ];
 

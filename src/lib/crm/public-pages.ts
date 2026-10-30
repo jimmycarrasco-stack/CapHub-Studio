@@ -19,14 +19,17 @@ export function notFoundPage(message = "This page isn't available.") {
   });
 }
 
-/** Renders step N (1-based) of a funnel with the runtime pointed at the next step. */
-export function renderFunnelStep(slug: string, stepNumber: number, base: string) {
+/**
+ * Renders step N (1-based) of a funnel with the runtime pointed at the next step.
+ * `stepUrl` builds step links (custom domains use "/2" instead of "/f/<slug>/2").
+ */
+export function renderFunnelStep(slug: string, stepNumber: number, base: string, stepUrl?: (n: number) => string) {
   const funnel = getFunnelBySlug(slug);
   if (!funnel || !Number.isInteger(stepNumber) || stepNumber < 1) return notFoundPage();
   const step = funnel.steps[stepNumber - 1];
   const site = step ? getSite(step.site_id) : null;
   if (!site || !site.html) return notFoundPage("This funnel step hasn't been built yet.");
-  const next = funnel.steps[stepNumber] ? `${base}/f/${funnel.slug}/${stepNumber + 1}` : null;
+  const next = funnel.steps[stepNumber] ? (stepUrl ? stepUrl(stepNumber + 1) : `${base}/f/${funnel.slug}/${stepNumber + 1}`) : null;
   const html = injectRuntime(site.html, {
     siteId: site.id,
     baseUrl: base,

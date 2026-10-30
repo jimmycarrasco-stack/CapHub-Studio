@@ -41,7 +41,7 @@ const GROUPS: { label?: string; items: NavItem[] }[] = [
   {
     label: "Build",
     items: [
-      { href: "/sites", label: "Sites & Funnels", icon: I.site, match: ["/sites", "/funnels"] },
+      { href: "/sites", label: "Sites & Funnels", icon: I.site, match: ["/sites", "/funnels", "/domains"] },
       { href: "/apps", label: "App Builder", icon: I.code },
       { href: "/agents", label: "AI Agents", icon: I.bot },
     ],

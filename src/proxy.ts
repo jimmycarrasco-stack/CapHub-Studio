@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isAppHost } from "@/lib/app-host";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 /**
@@ -19,8 +20,21 @@ const PUBLIC_PREFIXES = [
 ];
 const PUBLIC_FILES = ["/widget.js", "/caphub-runtime.js", "/favicon.ico", "/sw.js"];
 
+/** Paths served as-is on custom domains (page assets, forms/checkout APIs, payment pages). */
+const CUSTOM_DOMAIN_PASSTHROUGH = ["/_next/", "/api/public/", "/pay/"];
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Custom domains: only the connected site/funnel is reachable — never the CapHub app itself.
+  const host = req.headers.get("host") ?? "";
+  if (host && !isAppHost(host)) {
+    if (PUBLIC_FILES.includes(pathname) || CUSTOM_DOMAIN_PASSTHROUGH.some((p) => pathname.startsWith(p))) return NextResponse.next();
+    const url = req.nextUrl.clone();
+    url.pathname = `/d/${encodeURIComponent(host.toLowerCase().replace(/:\d+$/, ""))}${pathname === "/" ? "" : pathname}`;
+    return NextResponse.rewrite(url);
+  }
+
   if (PUBLIC_FILES.includes(pathname) || PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
