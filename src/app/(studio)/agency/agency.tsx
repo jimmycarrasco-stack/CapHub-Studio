@@ -4,7 +4,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api, Badge, Button, Card, Field, Input, Modal, PageHeader, Select, toast } from "@/components/ui";
 
-type Loc = { id: string; name: string; email: string; phone: string; website: string; timezone: string; contacts: number; members: number };
+type Loc = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  website: string;
+  timezone: string;
+  status: "active" | "suspended";
+  source_order_id: string | null;
+  contacts: number;
+  members: number;
+};
 type U = { id: string; email: string; name: string; agency_role: "owner" | "admin" | null; locations: { id: string; name: string; role: string }[] };
 
 const TIMEZONES = typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : ["America/Winnipeg"];
@@ -16,6 +27,17 @@ export function Agency({ me, initialLocations, initialUsers }: { me: { id: strin
   const [deletingLoc, setDeletingLoc] = useState<Loc | null>(null);
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [editingUser, setEditingUser] = useState<U | null>(null);
+
+  async function setStatus(l: Loc, status: "active" | "suspended") {
+    if (status === "suspended" && !window.confirm(`Suspend ${l.name}? Its users won't be able to sign in until you reactivate it. Nothing is deleted.`)) return;
+    try {
+      await api(`/api/agency/locations/${l.id}`, { method: "PATCH", json: { status } });
+      toast(status === "suspended" ? `${l.name} suspended` : `${l.name} reactivated`, "success");
+      router.refresh();
+    } catch (e) {
+      toast((e as Error).message, "error");
+    }
+  }
 
   async function open(id: string) {
     try {
@@ -48,7 +70,11 @@ export function Agency({ me, initialLocations, initialUsers }: { me: { id: strin
             {initialLocations.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold">{l.name}</div>
+                  <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+                    {l.name}
+                    {l.status === "suspended" && <Badge tone="red">Suspended</Badge>}
+                    {l.source_order_id && <Badge tone="brand">From purchase</Badge>}
+                  </div>
                   <div className="text-xs text-zinc-500">
                     {l.contacts.toLocaleString()} contacts · {l.members} team member{l.members === 1 ? "" : "s"} · {l.timezone}
                   </div>
@@ -59,6 +85,9 @@ export function Agency({ me, initialLocations, initialUsers }: { me: { id: strin
                   </Button>
                   <Button size="sm" onClick={() => setEditingLoc(l)}>
                     Edit
+                  </Button>
+                  <Button size="sm" onClick={() => setStatus(l, l.status === "suspended" ? "active" : "suspended")}>
+                    {l.status === "suspended" ? "Reactivate" : "Suspend"}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setDeletingLoc(l)} disabled={initialLocations.length === 1}>
                     Delete
@@ -276,6 +305,25 @@ function ManageUser({ user, me, onClose, onSaved }: { user: U; me: { id: string;
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmDel, setConfirmDel] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+
+  async function makeLink() {
+    setBusy("link");
+    try {
+      const r = await api<{ url: string }>(`/api/agency/users/${user.id}/login-link`, { method: "POST" });
+      setLink(r.url);
+      try {
+        await navigator.clipboard.writeText(r.url);
+        toast("Link copied — send it to them privately", "success");
+      } catch {
+        /* shown below */
+      }
+    } catch (e) {
+      toast((e as Error).message, "error");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function patch(json: object, label: string) {
     setBusy(label);
@@ -317,6 +365,15 @@ function ManageUser({ user, me, onClose, onSaved }: { user: U; me: { id: string;
           <Button loading={busy === "pw"} disabled={password.length < 10} onClick={() => patch({ password }, "pw")}>
             Set
           </Button>
+        </div>
+        <div className="space-y-2 rounded-lg bg-zinc-50 p-3 text-sm ring-1 ring-zinc-200">
+          <div className="flex items-center justify-between gap-2">
+            <span>One-time link to set their password (valid 7 days)</span>
+            <Button size="sm" loading={busy === "link"} onClick={makeLink}>
+              Create link
+            </Button>
+          </div>
+          {link && <code className="block rounded bg-white px-2 py-1.5 font-mono text-xs break-all ring-1 ring-zinc-200">{link}</code>}
         </div>
         {me.role === "owner" && user.agency_role !== "owner" && (
           <div className="flex items-center justify-between rounded-lg bg-zinc-50 p-3 text-sm ring-1 ring-zinc-200">

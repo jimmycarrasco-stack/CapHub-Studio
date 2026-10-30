@@ -13,7 +13,7 @@ export default async function NoAccessPage() {
   if (user.agency_role) redirect("/agency");
   return (
     <AuthCard title="You're signed in" subtitle={user.email}>
-      <p className="text-sm text-zinc-600">You haven&apos;t been added to a sub-account yet. Ask your agency admin to add you from the sub-account&apos;s Settings → Team page, then sign in again.</p>
+      <p className="text-sm text-zinc-600">You don&apos;t have an active sub-account right now — either you haven&apos;t been added to one yet, or your account is paused (for example, if a subscription ended). Contact your account provider, then sign in again.</p>
       <SignOutButton />
     </AuthCard>
   );

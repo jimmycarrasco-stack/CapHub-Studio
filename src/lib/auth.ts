@@ -33,6 +33,11 @@ export interface Location {
   email: string;
   phone: string;
   website: string;
+  /** "suspended" blocks sign-in for its users (agency admins still have access). */
+  status: "active" | "suspended";
+  source_order_id: string | null;
+  billing_location_id: string | null;
+  stripe_subscription_id: string | null;
   created_at: string;
 }
 
@@ -129,6 +134,10 @@ export function updateLocation(id: string, patch: Partial<Pick<Location, "name" 
   return getLocation(id);
 }
 
+export function setLocationStatus(id: string, status: "active" | "suspended") {
+  db().prepare("UPDATE locations SET status = ? WHERE id = ?").run(status, id);
+}
+
 export function deleteLocation(id: string) {
   db().prepare("DELETE FROM locations WHERE id = ?").run(id);
 }
@@ -137,13 +146,17 @@ export function deleteLocation(id: string) {
 export function listUserLocations(user: User): (Location & { role: LocationRole })[] {
   if (user.agency_role) return listAllLocations().map((l) => ({ ...l, role: "admin" as const }));
   return db()
-    .prepare("SELECT l.*, m.role FROM memberships m JOIN locations l ON l.id = m.location_id WHERE m.user_id = ? ORDER BY l.name COLLATE NOCASE")
+    .prepare(
+      "SELECT l.*, m.role FROM memberships m JOIN locations l ON l.id = m.location_id WHERE m.user_id = ? AND l.status = 'active' ORDER BY l.name COLLATE NOCASE",
+    )
     .all(user.id) as (Location & { role: LocationRole })[];
 }
 
 export function roleIn(user: User, locationId: string): LocationRole | null {
   if (user.agency_role) return getLocation(locationId) ? "admin" : null;
-  const r = db().prepare("SELECT role FROM memberships WHERE user_id = ? AND location_id = ?").get(user.id, locationId) as { role: LocationRole } | undefined;
+  const r = db()
+    .prepare("SELECT m.role FROM memberships m JOIN locations l ON l.id = m.location_id WHERE m.user_id = ? AND m.location_id = ? AND l.status = 'active'")
+    .get(user.id, locationId) as { role: LocationRole } | undefined;
   return r?.role ?? null;
 }
 

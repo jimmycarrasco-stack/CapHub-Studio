@@ -29,12 +29,15 @@ export interface Product {
   stripe_product_id: string | null;
   stripe_price_id: string | null;
   sync_error: string | null;
+  /** SaaS mode: buying this creates a sub-account for the buyer. */
+  provisions_subaccount: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface Order {
   id: string;
+  location_id: string;
   contact_id: string | null;
   contact_name: string | null;
   contact_email: string | null;
@@ -51,6 +54,7 @@ type Row = Record<string, unknown>;
 const toProduct = (r: Row) => ({
   ...(r as unknown as Product),
   active: !!r.active,
+  provisions_subaccount: !!r.provisions_subaccount,
 });
 
 // ───────── Stripe client ─────────
@@ -240,6 +244,12 @@ export async function deleteProduct(id: string) {
   return { archived: false };
 }
 
+/** Agency-admin setting: buying this product creates a sub-account (checked by the API route). */
+export function setProductProvisions(id: string, on: boolean) {
+  db().prepare("UPDATE products SET provisions_subaccount = ?, updated_at = datetime('now') WHERE id = ?").run(on ? 1 : 0, id);
+  return getProduct(id);
+}
+
 // ───────── checkout ─────────
 
 export async function createCheckout(
@@ -277,6 +287,9 @@ export async function createCheckout(
           payment_intent_data: { metadata },
         }),
     phone_number_collection: { enabled: true },
+    ...(product.provisions_subaccount
+      ? { custom_fields: [{ key: "business_name", label: { type: "custom" as const, custom: "Business name" }, type: "text" as const, optional: false }] }
+      : {}),
     billing_address_collection: "auto",
     allow_promotion_codes: true,
     metadata,
@@ -382,7 +395,7 @@ export function markRefunded(paymentIntentId: string) {
 
 // ───────── orders ─────────
 
-const ORDER_SELECT = `SELECT o.id, o.contact_id, TRIM(c.first_name || ' ' || c.last_name) AS contact_name, c.email AS contact_email,
+const ORDER_SELECT = `SELECT o.id, o.location_id, o.contact_id, TRIM(c.first_name || ' ' || c.last_name) AS contact_name, c.email AS contact_email,
   o.product_id, o.product_name, o.amount_cents, o.currency, o.status, o.kind, o.created_at
   FROM orders o LEFT JOIN contacts c ON c.id = o.contact_id`;
 

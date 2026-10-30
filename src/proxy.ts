@@ -8,6 +8,7 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 const PUBLIC_PREFIXES = [
   "/login",
   "/setup",
+  "/set-password",
   "/api/auth/",
   "/p/", // published sites
   "/f/", // published funnels

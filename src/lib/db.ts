@@ -382,7 +382,23 @@ const MIGRATIONS: Migration[] = [
         db.prepare("INSERT INTO stages (id, pipeline_id, name, position) VALUES (?, ?, ?, ?)").run("s" + Math.random().toString(36).slice(2, 11), pid, name, i),
       );
     }
-  },
+  },  // 5: SaaS mode — products that create a sub-account for the buyer; suspended sub-accounts; password set links
+  `
+    ALTER TABLE products ADD COLUMN provisions_subaccount INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE locations ADD COLUMN status TEXT NOT NULL DEFAULT 'active';      -- active | suspended
+    ALTER TABLE locations ADD COLUMN source_order_id TEXT;                       -- order that created it (SaaS)
+    ALTER TABLE locations ADD COLUMN billing_location_id TEXT;                   -- sub-account whose Stripe bills it
+    ALTER TABLE locations ADD COLUMN stripe_subscription_id TEXT;
+    CREATE UNIQUE INDEX idx_locations_source_order ON locations(source_order_id) WHERE source_order_id IS NOT NULL;
+    CREATE INDEX idx_locations_subscription ON locations(stripe_subscription_id);
+    CREATE TABLE password_tokens (
+      token_hash TEXT PRIMARY KEY,
+      user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      used_at    TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `,
 ];
 
 export const MIGRATIONS_FOR_TESTS = MIGRATIONS;

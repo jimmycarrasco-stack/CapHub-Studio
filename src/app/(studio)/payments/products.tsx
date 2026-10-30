@@ -4,7 +4,7 @@ import { useState } from "react";
 import { api, Badge, Button, Field, Input, Modal, money, Select, Textarea, toast, toCents, Toggle } from "@/components/ui";
 import type { Product } from "@/lib/crm/payments";
 
-export function Products({ initial, stripeConnected }: { initial: Product[]; stripeConnected: boolean }) {
+export function Products({ initial, stripeConnected, isAgencyAdmin }: { initial: Product[]; stripeConnected: boolean; isAgencyAdmin: boolean }) {
   const [products, setProducts] = useState(initial);
   const [editing, setEditing] = useState<Product | "new" | null>(null);
 
@@ -54,6 +54,11 @@ export function Products({ initial, stripeConnected }: { initial: Product[]; str
                 {p.interval && <span className="text-sm font-normal text-zinc-500">/{p.interval}</span>}
               </div>
               {p.description && <p className="mt-1 line-clamp-2 text-xs text-zinc-500">{p.description}</p>}
+              {p.provisions_subaccount && (
+                <p className="mt-2">
+                  <Badge tone="brand">Creates a sub-account</Badge>
+                </p>
+              )}
               {p.sync_error && <p className="mt-2 text-xs text-red-600">Stripe: {p.sync_error}</p>}
               <div className="mt-auto flex flex-wrap gap-1.5 pt-3">
                 <Button size="sm" onClick={() => setEditing(p)}>
@@ -79,6 +84,7 @@ export function Products({ initial, stripeConnected }: { initial: Product[]; str
       </p>
       {editing && (
         <ProductModal
+          isAgencyAdmin={isAgencyAdmin}
           product={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSaved={(p, removed) => {
@@ -92,7 +98,18 @@ export function Products({ initial, stripeConnected }: { initial: Product[]; str
   );
 }
 
-function ProductModal({ product, onClose, onSaved }: { product: Product | null; onClose: () => void; onSaved: (p: Product, removed?: boolean) => void }) {
+function ProductModal({
+  product,
+  isAgencyAdmin,
+  onClose,
+  onSaved,
+}: {
+  product: Product | null;
+  isAgencyAdmin: boolean;
+  onClose: () => void;
+  onSaved: (p: Product, removed?: boolean) => void;
+}) {
+  const [saas, setSaas] = useState(product?.provisions_subaccount ?? false);
   const [f, setF] = useState({
     name: product?.name ?? "",
     description: product?.description ?? "",
@@ -109,7 +126,8 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | null; 
     setBusy(true);
     try {
       const json = { name: f.name, description: f.description, priceCents: cents, currency: f.currency, interval: f.interval || null, active: f.active };
-      const p = product ? await api<Product>(`/api/products/${product.id}`, { method: "PATCH", json }) : await api<Product>("/api/products", { method: "POST", json });
+      let p = product ? await api<Product>(`/api/products/${product.id}`, { method: "PATCH", json }) : await api<Product>("/api/products", { method: "POST", json });
+      if (isAgencyAdmin && saas !== p.provisions_subaccount) p = await api<Product>(`/api/products/${p.id}/saas`, { method: "PUT", json: { enabled: saas } });
       if (p.sync_error) toast(`Saved, but Stripe sync failed: ${p.sync_error}`, "error");
       onSaved(p);
     } catch (e) {
@@ -168,6 +186,18 @@ function ProductModal({ product, onClose, onSaved }: { product: Product | null; 
           </Field>
         </div>
         {product && <p className="text-xs text-zinc-500">Changing the price creates a new Stripe price; existing subscribers keep their current price.</p>}
+        {isAgencyAdmin && (
+          <label className="flex items-start justify-between gap-3 rounded-lg bg-brand-50/60 p-3 text-sm ring-1 ring-brand-100">
+            <span>
+              <span className="font-medium">Creates a sub-account when purchased</span>
+              <span className="block text-xs text-zinc-600">
+                The buyer gets their own sub-account and an admin login, and we email them a link to set their password. For subscriptions, the sub-account is suspended if they cancel or
+                stop paying (needs the Stripe webhook) and reactivated when they pay.
+              </span>
+            </span>
+            <Toggle checked={saas} onChange={setSaas} label="Creates a sub-account when purchased" />
+          </label>
+        )}
         {product && (
           <label className="flex items-center justify-between text-sm">
             Active (can be bought)

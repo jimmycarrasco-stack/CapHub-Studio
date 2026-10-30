@@ -133,7 +133,8 @@ export function StripeSettings({ initial, webhookUrl }: { initial: StripeState; 
             </div>
             <p className="text-xs text-zinc-600">
               Records subscription renewals, refunds, and payments even if the buyer closes the tab early. In Stripe: Developers → Webhooks → Add endpoint, paste this URL, and select{" "}
-              <code>checkout.session.completed</code>, <code>invoice.paid</code> and <code>charge.refunded</code>. Then paste the signing secret below.
+              <code>checkout.session.completed</code>, <code>invoice.paid</code>, <code>charge.refunded</code>, <code>customer.subscription.updated</code> and{" "}
+              <code>customer.subscription.deleted</code>. Then paste the signing secret below.
             </p>
             <code className="block rounded bg-white px-2 py-1.5 font-mono text-xs break-all ring-1 ring-zinc-200">{webhookUrl}</code>
             <p className="text-xs text-zinc-500">Stripe can only reach this URL if CapHub Studio is on the internet (not just on your Mac).</p>

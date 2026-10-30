@@ -53,7 +53,7 @@ export default async function PaymentsPage() {
         </div>
       )}
 
-      <Products initial={listProducts(loc)} stripeConnected={stripe.connected} />
+      <Products initial={listProducts(loc)} stripeConnected={stripe.connected} isAgencyAdmin={ctx.isAgencyAdmin} />
 
       <h2 className="mt-10 mb-3 text-sm font-semibold">Orders</h2>
       {orders.length === 0 ? (

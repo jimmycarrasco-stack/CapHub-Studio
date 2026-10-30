@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { getLocation } from "@/lib/auth";
 import { formatMoney, recordCheckoutSession, stripeFor } from "@/lib/crm/payments";
+import { provisionFromOrder } from "@/lib/crm/saas";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Payment received", robots: { index: false } };
@@ -16,6 +17,9 @@ export default async function PaySuccess({ searchParams }: { searchParams: Promi
   let message = "Thank you! Your payment was received.";
   let amount: string | null = null;
   let ok = false;
+  let accountNote: string | null = null;
+  const h = await headers();
+  const origin = process.env.PUBLIC_BASE_URL?.replace(/\/+$/, "") || `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
 
   if (stripe && loc && sp.session_id && /^cs_[A-Za-z0-9_]+$/.test(sp.session_id)) {
     try {
@@ -24,6 +28,16 @@ export default async function PaySuccess({ searchParams }: { searchParams: Promi
       if (order) {
         ok = true;
         amount = formatMoney(order.amount_cents, order.currency);
+        try {
+          const p = await provisionFromOrder(order, session, origin);
+          if (p)
+            accountNote = p.newUser || !p.created
+              ? `Your “${p.location.name}” account is ready. We've emailed ${session.customer_details?.email ?? "you"} a link to set your password.`
+              : `“${p.location.name}” has been added to your account — sign in with your existing login.`;
+        } catch (err) {
+          console.error("SaaS provisioning failed", err);
+          accountNote = "Your account is being set up — we'll email you shortly.";
+        }
       } else message = "Your payment is processing. You'll get a confirmation email from Stripe shortly.";
     } catch {
       message = "We couldn't confirm the payment yet. If you were charged, you'll receive a receipt from Stripe.";
@@ -31,8 +45,6 @@ export default async function PaySuccess({ searchParams }: { searchParams: Promi
   }
 
   // Funnels: continue to the next step (only same-site URLs).
-  const h = await headers();
-  const origin = process.env.PUBLIC_BASE_URL?.replace(/\/+$/, "") || `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}`;
   const next = ok && sp.return && sp.return.startsWith(`${origin}/f/`) ? sp.return : null;
 
   return (
@@ -42,6 +54,7 @@ export default async function PaySuccess({ searchParams }: { searchParams: Promi
         <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-50 text-2xl text-emerald-600">✓</div>
         <h1 className="mt-4 text-xl font-semibold text-zinc-900">{ok ? "Payment received" : "Thanks!"}</h1>
         <p className="mt-2 text-sm text-zinc-600">{amount ? `${message} (${amount})` : message}</p>
+        {accountNote && <p className="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-sm text-brand-700">{accountNote}</p>}
         {loc && <p className="mt-4 text-sm text-zinc-500">— {loc.name}</p>}
         {next && (
           <a href={next} className="mt-6 inline-block rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white">

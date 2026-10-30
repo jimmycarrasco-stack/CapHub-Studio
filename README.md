@@ -9,6 +9,7 @@ A simpler, self-hosted GoHighLevel-style CRM with an AI studio built in:
 - **Automations** — trigger (contact created, tag added, form submitted, deal stage/status, payment, inbound webhook, manual) → steps (email incl. AI-written, notify team, tags, create/move deal, task, wait, condition, outbound webhook). Run logs per automation and per contact.
 - **Email** — send from the sub-account's own SMTP (Gmail, Microsoft 365, SendGrid, Resend, Mailgun…); every email is logged under Conversations.
 - **Funnels** — chain Site Builder pages; form submits move visitors to the next step and create/update the contact.
+- **SaaS mode** — mark a product "Creates a sub-account when purchased" (agency admins). After checkout the buyer gets their own sub-account (named from a "Business name" checkout field), an admin login, and an email with a one-time link to set their password. Subscription cancellations/non-payment suspend the sub-account (data kept, sign-in blocked) and payment reactivates it; agency admins can also suspend/reactivate and create login links by hand.
 - **AI Guide** — a chat drawer on every page that explains the app and does setup work for you (contacts, tags, notes, tasks, pipelines, deals, products, automations, sites, funnels). It can't delete anything or send emails, and automations it builds are saved switched off for review.
 
 And the original studio:

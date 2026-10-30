@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { deleteLocation, getLocation, listAllLocations, requireAgencyAdmin, updateLocation } from "@/lib/auth";
+import { deleteLocation, getLocation, listAllLocations, requireAgencyAdmin, setLocationStatus, updateLocation } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { handle, HttpError, parseBody } from "@/lib/http";
 import { locationSchema } from "@/lib/crm/schemas";
@@ -16,7 +16,10 @@ async function load(ctx: Ctx) {
 
 export const PATCH = handle(async (req: Request, ctx: Ctx) => {
   const loc = await load(ctx);
-  return NextResponse.json(updateLocation(loc.id, await parseBody(req, locationSchema.partial())));
+  const body = await parseBody(req, locationSchema.partial().extend({ status: z.enum(["active", "suspended"]).optional() }));
+  const { status, ...rest } = body;
+  if (status) setLocationStatus(loc.id, status);
+  return NextResponse.json(updateLocation(loc.id, rest));
 });
 
 /**
